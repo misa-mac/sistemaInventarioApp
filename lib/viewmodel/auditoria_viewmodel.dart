@@ -1,0 +1,128 @@
+import 'package:flutter/material.dart';
+import 'package:inventario_qr_app/repositories/auditoria_repository.dart';
+import 'package:inventario_qr_app/models/auditoria_model.dart';
+
+class AuditoriaViewModel extends ChangeNotifier {
+  final AuditoriaRepository _auditoriaRepository = AuditoriaRepository();
+
+  AuditoriaModel? _auditoriaActual;
+  List<DetalleAuditoriaModel> _detalles = [];
+  bool _isLoading = false;
+  String? _error;
+  int _escaneosCont = 0;
+
+  // Getters
+  AuditoriaModel? get auditoriaActual => _auditoriaActual;
+  List<DetalleAuditoriaModel> get detalles => _detalles;
+  bool get isLoading => _isLoading;
+  String? get error => _error;
+  int get escaneosCont => _escaneosCont;
+
+  Future<bool> iniciarAuditoria(
+    String ambienteId,
+    String tecnicoId,
+    int totalEsperados,
+  ) async {
+    _isLoading = true;
+    _error = null;
+    _escaneosCont = 0;
+    _detalles = [];
+    notifyListeners();
+
+    try {
+      _auditoriaActual = await _auditoriaRepository.crearAuditoria(
+        ambienteId,
+        tecnicoId,
+        totalEsperados,
+      );
+
+      _isLoading = false;
+      if (_auditoriaActual != null) {
+        notifyListeners();
+        return true;
+      } else {
+        _error = 'No se pudo crear la auditoría';
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _error = 'Error iniciando auditoría: $e';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> registrarEscaneo(
+    String activoId,
+    String estado,
+    String? observacion,
+  ) async {
+    if (_auditoriaActual == null) return false;
+
+    try {
+      final resultado = await _auditoriaRepository.registrarDetalleAuditoria(
+        _auditoriaActual!.id,
+        activoId,
+        estado,
+        observacion,
+      );
+
+      if (resultado) {
+        _escaneosCont++;
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _error = 'Error registrando escaneo: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> finalizarAuditoria() async {
+    if (_auditoriaActual == null) return false;
+
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final resultado = await _auditoriaRepository.finalizarAuditoria(
+        _auditoriaActual!.id,
+        _escaneosCont,
+      );
+
+      _isLoading = false;
+      notifyListeners();
+      return resultado;
+    } catch (e) {
+      _error = 'Error finalizando auditoría: $e';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> cargarDetalles() async {
+    if (_auditoriaActual == null) return;
+
+    try {
+      _detalles = await _auditoriaRepository.getDetallesAuditoria(
+        _auditoriaActual!.id,
+      );
+      notifyListeners();
+    } catch (e) {
+      _error = 'Error cargando detalles: $e';
+      notifyListeners();
+    }
+  }
+
+  void limpiarAuditoria() {
+    _auditoriaActual = null;
+    _detalles = [];
+    _escaneosCont = 0;
+    _error = null;
+    notifyListeners();
+  }
+}
