@@ -37,7 +37,7 @@ class MyApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         home: const AuthWrapper(),
         onGenerateRoute: AppRoutes.generateRoute,
-        initialRoute: AppRoutes.home,
+        initialRoute: AppRoutes.main,
       ),
     );
   }

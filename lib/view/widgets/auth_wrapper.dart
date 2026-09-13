@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:inventario_qr_app/viewmodel/auth_viewmodel.dart';
 import 'package:inventario_qr_app/view/screens/login_screen.dart';
-import 'package:inventario_qr_app/view/screens/home_screen.dart';
+import 'package:inventario_qr_app/view/screens/main_screen.dart';
 
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
@@ -12,7 +12,7 @@ class AuthWrapper extends StatelessWidget {
     return Consumer<AuthViewModel>(
       builder: (context, authVM, _) {
         if (authVM.isLoggedIn) {
-          return const HomeScreen();
+          return const MainScreen();
         } else {
           return const LoginScreen();
         }

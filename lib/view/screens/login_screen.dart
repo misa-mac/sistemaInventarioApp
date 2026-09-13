@@ -140,7 +140,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success && context.mounted) {
-      Navigator.of(context).pushReplacementNamed('/home');
+      Navigator.of(context).pushReplacementNamed('/main');
     }
   }
 }
