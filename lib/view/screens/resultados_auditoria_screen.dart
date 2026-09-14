@@ -151,7 +151,7 @@ class _ResultadosAuditoriaScreenState extends State<ResultadosAuditoriaScreen> {
                   child: ElevatedButton(
                     onPressed: () {
                       context.read<AuditoriaViewModel>().limpiarAuditoria();
-                      Navigator.of(context).pushReplacementNamed('/home');
+                      Navigator.of(context).pushReplacementNamed('/main');
                     },
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),

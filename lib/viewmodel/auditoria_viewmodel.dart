@@ -61,6 +61,8 @@ class AuditoriaViewModel extends ChangeNotifier {
     if (_auditoriaActual == null) return false;
 
     try {
+      print('📝 Registrando escaneo: $activoId');
+      
       final resultado = await _auditoriaRepository.registrarDetalleAuditoria(
         _auditoriaActual!.id,
         activoId,
@@ -70,33 +72,49 @@ class AuditoriaViewModel extends ChangeNotifier {
 
       if (resultado) {
         _escaneosCont++;
-        notifyListeners();
+        print('✅ Escaneo registrado. Total: $_escaneosCont');
+        notifyListeners(); // ← CRÍTICO: Actualizar UI
         return true;
       }
       return false;
     } catch (e) {
       _error = 'Error registrando escaneo: $e';
+      print('❌ Error: $e');
       notifyListeners();
       return false;
     }
   }
 
   Future<bool> finalizarAuditoria() async {
-    if (_auditoriaActual == null) return false;
+    if (_auditoriaActual == null) {
+      print('❌ No hay auditoría activa');
+      return false;
+    }
 
     _isLoading = true;
     notifyListeners();
 
     try {
+      print('🏁 Finalizando auditoría: ${_auditoriaActual!.id}');
+      print('Total escaneados: $_escaneosCont');
+      print('Ambiente ID: ${_auditoriaActual!.ambienteId}');
+      
       final resultado = await _auditoriaRepository.finalizarAuditoria(
         _auditoriaActual!.id,
         _escaneosCont,
       );
 
+      print('Resultado: $resultado');
+      
+      if (resultado) {
+        _auditoriaActual = _auditoriaActual!; // Mantener referencia
+      }
+      
       _isLoading = false;
       notifyListeners();
       return resultado;
     } catch (e) {
+      print('❌ Error finalizando: $e');
       _error = 'Error finalizando auditoría: $e';
       _isLoading = false;
       notifyListeners();

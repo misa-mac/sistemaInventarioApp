@@ -12,8 +12,13 @@ class AuditoriaRepository {
     int totalEsperados,
   ) async {
     try {
+      print('📋 Creando auditoría...');
+      print('Ambiente ID: $ambienteId');
+      print('Técnico ID: $tecnicoId');
+      print('Total esperados: $totalEsperados');
+
       final auditoria = AuditoriaModel(
-        id: '', // Supabase genera
+        id: '',
         ambienteId: ambienteId,
         tecnicoId: tecnicoId,
         fechaInicio: DateTime.now(),
@@ -26,9 +31,34 @@ class AuditoriaRepository {
         auditoria.toJson(),
       );
 
-      return AuditoriaModel.fromJson(response);
+      print('Respuesta de BD: $response');
+
+      // Si respuesta vacía, esperar a que Supabase retorne el registro
+      if (response is Map) {
+        if (response.containsKey('id') && response['id'] != null) {
+          print('✅ Auditoría creada con ID: ${response['id']}');
+          return AuditoriaModel.fromJson(response as Map<String, dynamic>);
+        } else if (response.isEmpty) {
+          // Consultar la auditoría recién creada
+          print('⏳ Esperando que Supabase genere el ID...');
+          await Future.delayed(const Duration(milliseconds: 500));
+          
+          // Buscar la auditoría más reciente de este técnico
+          final recentResponse = await _apiClient.get(
+            '${ApiConstants.auditoriasEndpoint}?tecnico_id=eq.$tecnicoId&order=fecha_inicio.desc&limit=1',
+          );
+          
+          if (recentResponse is List && recentResponse.isNotEmpty) {
+            print('✅ Auditoría encontrada: ${recentResponse[0]['id']}');
+            return AuditoriaModel.fromJson(recentResponse[0] as Map<String, dynamic>);
+          }
+        }
+      }
+
+      print('❌ No se pudo crear auditoría');
+      return null;
     } catch (e) {
-      debugPrint('Error creando auditoría: $e');
+      print('Error creando auditoría: $e');
       return null;
     }
   }
@@ -65,16 +95,22 @@ class AuditoriaRepository {
     int totalEncontrados,
   ) async {
     try {
-      await _apiClient.post(
+      print('🏁 Finalizando auditoría: $auditoriaId');
+      print('Total encontrados: $totalEncontrados');
+      
+      // Usar PATCH en lugar de POST para actualizar
+      final response = await _apiClient.patch(
         '${ApiConstants.auditoriasEndpoint}?id=eq.$auditoriaId',
         {
           'fecha_fin': DateTime.now().toIso8601String(),
           'total_encontrados': totalEncontrados,
         },
       );
+
+      print('📥 Respuesta finalizar: $response');
       return true;
     } catch (e) {
-      debugPrint('Error finalizando auditoría: $e');
+      print('❌ Error finalizando auditoría: $e');
       return false;
     }
   }

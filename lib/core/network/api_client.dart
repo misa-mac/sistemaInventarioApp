@@ -14,29 +14,65 @@ class ApiClient {
     };
   }
 
-  Future<Map<String, dynamic>> get(String endpoint) async {
+  Future<dynamic> get(String endpoint) async {
     final url = Uri.parse('$_supabaseUrl$endpoint');
     final response = await http.get(url, headers: _getHeaders());
     
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
-      throw Exception('Error: ${response.statusCode}');
+      throw Exception('Error: ${response.statusCode} - ${response.body}');
     }
   }
 
-  Future<Map<String, dynamic>> post(String endpoint, Map<String, dynamic> body) async {
+  Future<dynamic> post(String endpoint, Map<String, dynamic> body) async {
     final url = Uri.parse('$_supabaseUrl$endpoint');
+    
+    print('📤 POST a: $url');
+    print('📦 Body: $body');
+    
     final response = await http.post(
       url,
       headers: _getHeaders(),
       body: jsonEncode(body),
     );
+
+    print('📥 Status: ${response.statusCode}');
+    print('📥 Response: ${response.body}');
     
     if (response.statusCode == 200 || response.statusCode == 201) {
+      if (response.body.isEmpty) {
+        print('⚠️ Respuesta vacía');
+        return {};
+      }
       return jsonDecode(response.body);
     } else {
-      throw Exception('Error: ${response.statusCode}');
+      throw Exception('Error: ${response.statusCode} - ${response.body}');
+    }
+  }
+
+  Future<dynamic> patch(String endpoint, Map<String, dynamic> body) async {
+    final url = Uri.parse('$_supabaseUrl$endpoint');
+    
+    print('🔧 PATCH a: $url');
+    print('📦 Body: $body');
+    
+    final response = await http.patch(
+      url,
+      headers: _getHeaders(),
+      body: jsonEncode(body),
+    );
+
+    print('📥 Status: ${response.statusCode}');
+    print('📥 Response: ${response.body}');
+    
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      if (response.body.isEmpty) {
+        return {};
+      }
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Error: ${response.statusCode} - ${response.body}');
     }
   }
 }

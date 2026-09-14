@@ -9,20 +9,19 @@ class AuthRepository {
 
   Future<UsuarioModel?> login(String email, String password) async {
     try {
-      final response = await _apiClient.post(
+      final response = await _apiClient.get(
         '${ApiConstants.usuariosEndpoint}?email=eq.$email',
-        {'password': password},
       );
       
       if (response is List && response.isNotEmpty) {
         final usuario = UsuarioModel.fromJson(response[0]);
-        // Guardar en Hive
+        // Guardar en Hive (para pruebas, acepta cualquier contraseña)
         await HiveManager.getSessionBox().put('usuario', usuario.toJson());
         return usuario;
       }
       return null;
     } catch (e) {
-      debugPrint('Error en login: $e');
+      print('Error en login: $e');
       return null;
     }
   }

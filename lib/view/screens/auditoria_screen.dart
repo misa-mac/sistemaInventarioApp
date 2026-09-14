@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:inventario_qr_app/viewmodel/auditoria_viewmodel.dart';
 import 'package:inventario_qr_app/viewmodel/ambiente_viewmodel.dart';
 import 'package:inventario_qr_app/viewmodel/auth_viewmodel.dart';
+import 'package:inventario_qr_app/viewmodel/activo_viewmodel.dart';
 
 class AuditoriaScreen extends StatefulWidget {
   const AuditoriaScreen({super.key});
@@ -38,11 +39,15 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
     // Cargar activos del ambiente
     await context.read<AmbienteViewModel>().cargarAmbientes();
     
-    // Iniciar auditoría
+    // Contar equipos del ambiente
+    final activosVM = context.read<ActivoViewModel>();
+    await activosVM.cargarActivosPorAmbiente(ambiente.id);
+    final totalEsperados = activosVM.activos.length;
+
     final success = await auditoriaVM.iniciarAuditoria(
       ambiente.id,
       usuario.id,
-      25, // Total esperados (ajustar según ambiente)
+      totalEsperados, // Calcula dinámicamente
     );
 
     if (!success && mounted) {

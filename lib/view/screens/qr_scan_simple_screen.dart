@@ -98,9 +98,11 @@ class _QrScanSimpleScreenState extends State<QrScanSimpleScreen> {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       builder: (context) => Container(
         padding: const EdgeInsets.all(16),
-        child: Column(
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -154,6 +156,7 @@ class _QrScanSimpleScreenState extends State<QrScanSimpleScreen> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

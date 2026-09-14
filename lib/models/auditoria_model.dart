@@ -35,8 +35,8 @@ class AuditoriaModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final json = {
+      // NO incluir 'id' si está vacío - dejar que Supabase lo genere
       'ambiente_id': ambienteId,
       'tecnico_id': tecnicoId,
       'fecha_inicio': fechaInicio.toIso8601String(),
@@ -45,6 +45,13 @@ class AuditoriaModel {
       'total_encontrados': totalEncontrados,
       'observaciones': observaciones,
     };
+    
+    // Solo incluir 'id' si no está vacío
+    if (id.isNotEmpty) {
+      json['id'] = id;
+    }
+    
+    return json;
   }
 }
 
@@ -77,13 +84,18 @@ class DetalleAuditoriaModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final json = {
       'auditoria_id': auditoriaId,
       'activo_id': activoId,
       'estado': estado,
       'observacion': observacion,
       'fecha_escaneo': fechaEscaneo.toIso8601String(),
     };
+    
+    if (id.isNotEmpty) {
+      json['id'] = id;
+    }
+    
+    return json;
   }
 }
