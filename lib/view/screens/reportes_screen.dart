@@ -12,6 +12,17 @@ class ReportesScreen extends StatefulWidget {
 
 class _ReportesScreenState extends State<ReportesScreen> {
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<AuditoriaViewModel>().cargarReportes();
+        context.read<ActivoViewModel>().cargarReportes();
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SingleChildScrollView(
@@ -35,35 +46,54 @@ class _ReportesScreenState extends State<ReportesScreen> {
               color: Colors.blue,
               contenido: Consumer<AuditoriaViewModel>(
                 builder: (context, auditoriaVM, _) {
-                  if (auditoriaVM.auditoriaActual == null) {
-                    return const Text('Sin auditorías recientes');
+                  if (auditoriaVM.ultimaAuditoria == null) {
+                    return const Text('Sin auditorías realizadas');
                   }
+                  final auditoria = auditoriaVM.ultimaAuditoria!;
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Fecha: ${auditoriaVM.auditoriaActual!.fechaInicio}'),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Fecha: ${auditoria.fechaInicio.toString().split('.')[0]}',
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Equipos: ${auditoria.totalEncontrados}/${auditoria.totalEsperados}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
+                              horizontal: 12,
+                              vertical: 6,
                             ),
                             decoration: BoxDecoration(
                               color: Colors.green[100],
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              'Completada',
-                              style: TextStyle(color: Colors.green[800]),
+                              '✅ Completada',
+                              style: TextStyle(
+                                color: Colors.green[800],
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Equipos encontrados: ${auditoriaVM.escaneosCont}/${auditoriaVM.auditoriaActual!.totalEsperados}',
                       ),
                     ],
                   );
@@ -80,20 +110,24 @@ class _ReportesScreenState extends State<ReportesScreen> {
               color: Colors.green,
               contenido: Consumer<ActivoViewModel>(
                 builder: (context, activoVM, _) {
-                  if (activoVM.activoActual == null) {
-                    return const Text('Sin escaneos recientes');
+                  if (activoVM.ultimoEscaneado == null) {
+                    return const Text('Sin escaneos realizados');
                   }
+                  final activo = activoVM.ultimoEscaneado!;
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Equipo: ${activoVM.activoActual!.nombre}',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        'Equipo: ${activo.nombre}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
+                      const SizedBox(height: 8),
+                      Text('Tipo: ${activo.tipo}'),
                       const SizedBox(height: 4),
-                      Text('Tipo: ${activoVM.activoActual!.tipo}'),
-                      const SizedBox(height: 4),
-                      Text('Estado: ${activoVM.activoActual!.estado}'),
+                      Text('Estado: ${activo.estado}'),
                     ],
                   );
                 },
@@ -104,35 +138,206 @@ class _ReportesScreenState extends State<ReportesScreen> {
             // Movimientos recientes
             _buildReporteCard(
               context,
-              titulo: 'Movimientos Recientes',
+              titulo: 'Escaneos Recientes',
               icono: Icons.swap_horiz,
               color: Colors.orange,
-              contenido: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildMovimientoItem('Pantalla 1', 'Lab 1 → Lab 2', 'Hace 2 horas'),
-                  const SizedBox(height: 8),
-                  _buildMovimientoItem('CPU 5', 'Lab 3 → Depósito', 'Hace 1 día'),
-                  const SizedBox(height: 8),
-                  _buildMovimientoItem('Teclado 12', 'Taller 1 → Lab 1', 'Hace 3 días'),
-                ],
+              contenido: Consumer<AuditoriaViewModel>(
+                builder: (context, auditoriaVM, _) {
+                  if (auditoriaVM.movimientosRecientes.isEmpty) {
+                    return const Text('Sin movimientos registrados');
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: auditoriaVM.movimientosRecientes.map((detalle) {
+                      final estadoColor = detalle.estado == 'presente'
+                          ? Colors.green
+                          : detalle.estado == 'faltante'
+                          ? Colors.red
+                          : Colors.orange;
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Activo: ${detalle.activoId.substring(0, 8)}...',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Estado: ${detalle.estado}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: estadoColor,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: estadoColor.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Icon(
+                                  detalle.estado == 'presente'
+                                      ? Icons.check
+                                      : detalle.estado == 'faltante'
+                                      ? Icons.close
+                                      : Icons.warning,
+                                  color: estadoColor,
+                                  size: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
               ),
             ),
             const SizedBox(height: 16),
 
-            // Cambios recientes
+            // Cambios recientes - Dispositivos nuevos
             _buildReporteCard(
               context,
-              titulo: 'Cambios Recientes',
-              icono: Icons.update,
-              color: Colors.purple,
-              contenido: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildCambioItem('✅', 'Dispositivo Nuevo', 'Monitor LG 27"', 'Hoy'),
-                  const SizedBox(height: 8),
-                  _buildCambioItem('❌', 'Dispositivo de Baja', 'CPU Antigua', 'Hace 2 días'),
-                ],
+              titulo: 'Dispositivos Nuevos',
+              icono: Icons.add_circle,
+              color: Colors.green,
+              contenido: Consumer<ActivoViewModel>(
+                builder: (context, activoVM, _) {
+                  if (activoVM.activosNuevos.isEmpty) {
+                    return const Text('Sin dispositivos nuevos');
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: activoVM.activosNuevos.map((activo) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.green[50],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.green[200]!),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Text('✅', style: TextStyle(fontSize: 16)),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      activo.nombre,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                activo.tipo,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Cambios recientes - Dispositivos de baja
+            _buildReporteCard(
+              context,
+              titulo: 'Dispositivos de Baja',
+              icono: Icons.delete_outline,
+              color: Colors.red,
+              contenido: Consumer<ActivoViewModel>(
+                builder: (context, activoVM, _) {
+                  if (activoVM.activosDeBaja.isEmpty) {
+                    return const Text('Sin dispositivos de baja');
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: activoVM.activosDeBaja.map((activo) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.red[50],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.red[200]!),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Text('❌', style: TextStyle(fontSize: 16)),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      activo.nombre,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                activo.tipo,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
               ),
             ),
           ],
@@ -179,72 +384,6 @@ class _ReportesScreenState extends State<ReportesScreen> {
             contenido,
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildMovimientoItem(String equipo, String movimiento, String fecha) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            equipo,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          Text(
-            movimiento,
-            style: const TextStyle(fontSize: 12),
-          ),
-          Text(
-            fecha,
-            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCambioItem(
-    String icono,
-    String tipo,
-    String descripcion,
-    String fecha,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(icono, style: const TextStyle(fontSize: 18)),
-              const SizedBox(width: 8),
-              Text(
-                tipo,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            descripcion,
-            style: const TextStyle(fontSize: 12),
-          ),
-          Text(
-            fecha,
-            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-          ),
-        ],
       ),
     );
   }

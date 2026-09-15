@@ -2,7 +2,6 @@ import 'package:inventario_qr_app/core/hive/hive_manager.dart';
 import 'package:inventario_qr_app/models/usuario_model.dart';
 import 'package:inventario_qr_app/core/network/api_client.dart';
 import 'package:inventario_qr_app/core/constants/api_constants.dart';
-import 'package:flutter/foundation.dart';
 
 class AuthRepository {
   final ApiClient _apiClient = ApiClient();

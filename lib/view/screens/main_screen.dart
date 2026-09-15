@@ -3,6 +3,7 @@ import 'package:inventario_qr_app/view/screens/inventario_screen.dart';
 import 'package:inventario_qr_app/view/screens/escaneo_screen.dart';
 import 'package:inventario_qr_app/view/screens/reportes_screen.dart';
 import 'package:inventario_qr_app/view/screens/perfil_screen.dart';
+import 'package:inventario_qr_app/view/screens/equipos_management_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -14,12 +15,19 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = const [
-    InventarioScreen(),
-    EscaneoScreen(),
-    ReportesScreen(),
-    PerfilScreen(),
-  ];
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = const [
+      InventarioScreen(),
+      EscaneoScreen(),
+      ReportesScreen(),
+      EquiposManagementScreen(),
+      PerfilScreen(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +60,10 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.assessment),
             label: 'Reportes',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Gestión',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),

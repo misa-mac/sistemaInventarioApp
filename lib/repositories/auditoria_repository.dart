@@ -123,11 +123,47 @@ class AuditoriaRepository {
 
       List<DetalleAuditoriaModel> detalles = [];
       if (response is List) {
-        detalles = (response as List).map((json) => DetalleAuditoriaModel.fromJson(json)).toList();
+        detalles = (response).map((json) => DetalleAuditoriaModel.fromJson(json)).toList();
       }
       return detalles;
     } catch (e) {
       debugPrint('Error obteniendo detalles: $e');
+      return [];
+    }
+  }
+
+  Future<AuditoriaModel?> getUltimaAuditoria() async {
+    try {
+      final response = await _apiClient.get(
+        '${ApiConstants.auditoriasEndpoint}?order=created_at.desc&limit=1',
+      );
+
+      if (response is List && response.isNotEmpty) {
+        return AuditoriaModel.fromJson(response[0] as Map<String, dynamic>);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error obteniendo última auditoría: $e');
+      return null;
+    }
+  }
+
+  Future<List<DetalleAuditoriaModel>> getMovimientosRecientes() async {
+    try {
+      // Obtenemos los últimos 3 detalles de auditoría como movimientos
+      final response = await _apiClient.get(
+        '${ApiConstants.detalleAuditoriaEndpoint}?order=fecha_escaneo.desc&limit=3',
+      );
+
+      List<DetalleAuditoriaModel> movimientos = [];
+      if (response is List) {
+        movimientos = response
+            .map((json) => DetalleAuditoriaModel.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
+      return movimientos;
+    } catch (e) {
+      debugPrint('Error obteniendo movimientos: $e');
       return [];
     }
   }

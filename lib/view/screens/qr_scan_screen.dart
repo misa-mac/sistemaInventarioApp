@@ -169,6 +169,13 @@ class _QrScanScreenState extends State<QrScanScreen> {
     } catch (e) {
       if (!mounted) return;
       _mostrarError('Error procesando QR: $e');
+    } finally {
+      // Resetear después de 3 segundos si no se procesó
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
+          _isProcessing = false;
+        }
+      });
     }
   }
 
@@ -224,11 +231,11 @@ class _QrScanScreenState extends State<QrScanScreen> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () {
-                        Navigator.pop(context);
-                        _isProcessing = false;
+                        _isProcessing = false; // ← Resetear ANTES de cerrar
                         setState(() {});
+                        Navigator.pop(context);
                       },
-                      child: const Text('Otro Escaneo'),
+                      child: const Text('Escanear Otro'),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -240,17 +247,18 @@ class _QrScanScreenState extends State<QrScanScreen> {
                           'presente',
                           null,
                         );
-                        if (!context.mounted) return;
-                        Navigator.pop(context);
-                        _isProcessing = false;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('✅ Equipo registrado'),
-                            backgroundColor: Colors.green,
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                        setState(() {});
+                        _isProcessing = false; // ← Resetear
+                        if (mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('✅ Equipo registrado'),
+                              backgroundColor: Colors.green,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                          setState(() {}); // ← Actualizar UI
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
@@ -338,13 +346,11 @@ class _QrScanScreenState extends State<QrScanScreen> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () async {
-                    // Registrar como NO ESPERADO
                     await auditoriaVM.registrarEscaneo(
                       codigoQr,
                       'no_esperado',
                       'Equipo no registrado en BD',
                     );
-                    if (!context.mounted) return;
                     Navigator.pop(context);
                     _isProcessing = false;
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -355,6 +361,13 @@ class _QrScanScreenState extends State<QrScanScreen> {
                       ),
                     );
                     setState(() {});
+                    
+                    // ← AGREGAR ESTO: Cerrar modal después de 1.5 segundos
+                    Future.delayed(const Duration(milliseconds: 1500), () {
+                      if (mounted && Navigator.canPop(context)) {
+                        Navigator.pop(context);
+                      }
+                    });
                   },
                   icon: const Icon(Icons.warning),
                   label: const Text('Marcar como No Esperado'),

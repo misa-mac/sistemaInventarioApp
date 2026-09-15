@@ -31,7 +31,7 @@ class _EscaneoScreenState extends State<EscaneoScreen> {
               titulo: 'Auditoría',
               descripcion: 'Verificar todos los equipos\nde un laboratorio',
               color: Colors.blue,
-              onTap: () => Navigator.of(context).pushNamed('/auditoria'),
+              onTap: () => Navigator.of(context).pushNamed('/select-ambiente-auditoria'),
             ),
             const SizedBox(height: 20),
 

@@ -1,3 +1,13 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.0")
+    }
+}
+
 allprojects {
     repositories {
         google()
@@ -20,7 +30,7 @@ subprojects {
         val androidExt = project.extensions.findByName("android")
         if (androidExt != null) {
             val extension = androidExt as? com.android.build.gradle.BaseExtension
-            extension?.compileSdkVersion(37)
+            extension?.compileSdkVersion(36)
         }
     }
 }

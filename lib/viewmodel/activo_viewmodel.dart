@@ -11,12 +11,18 @@ class ActivoViewModel extends ChangeNotifier {
   ActivoModel? _activoActual;
   bool _isLoading = false;
   String? _error;
+  ActivoModel? _ultimoEscaneado;
+  List<ActivoModel> _activosNuevos = [];
+  List<ActivoModel> _activosDeBaja = [];
 
   // Getters
   List<ActivoModel> get activos => _activos;
   ActivoModel? get activoActual => _activoActual;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  ActivoModel? get ultimoEscaneado => _ultimoEscaneado;
+  List<ActivoModel> get activosNuevos => _activosNuevos;
+  List<ActivoModel> get activosDeBaja => _activosDeBaja;
 
   Future<void> cargarActivosPorAmbiente(String ambienteId) async {
     _isLoading = true;
@@ -64,6 +70,18 @@ class ActivoViewModel extends ChangeNotifier {
       _error = 'Error actualizando estado: $e';
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<void> cargarReportes() async {
+    try {
+      _ultimoEscaneado = await _activoRepository.getUltimoActivoEscaneado();
+      _activosNuevos = await _activoRepository.getActivosNuevos();
+      _activosDeBaja = await _activoRepository.getActivosDeBaja();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error cargando reportes de activos: $e');
+      notifyListeners();
     }
   }
 }

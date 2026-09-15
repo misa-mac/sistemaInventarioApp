@@ -90,6 +90,12 @@ class _QrScanSimpleScreenState extends State<QrScanSimpleScreen> {
     } catch (e) {
       if (!mounted) return;
       _mostrarError('Error procesando QR: $e');
+    } finally {
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
+          _isProcessing = false;
+        }
+      });
     }
   }
 
@@ -148,9 +154,9 @@ class _QrScanSimpleScreenState extends State<QrScanSimpleScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(context);
                   _isProcessing = false;
                   setState(() {});
+                  Navigator.pop(context);
                 },
                 child: const Text('Escanear otro'),
               ),

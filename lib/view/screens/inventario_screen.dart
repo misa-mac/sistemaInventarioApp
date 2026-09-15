@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:inventario_qr_app/viewmodel/ambiente_viewmodel.dart';
+import 'package:inventario_qr_app/viewmodel/activo_viewmodel.dart';
 
 class InventarioScreen extends StatefulWidget {
   const InventarioScreen({super.key});
@@ -65,20 +66,17 @@ class _InventarioScreenState extends State<InventarioScreen> {
   }
 
   void _selectAmbiente(BuildContext context, AmbienteViewModel ambienteVM, dynamic ambiente) async {
+    // Seleccionar el ambiente
     await ambienteVM.seleccionarAmbiente(ambiente);
     
     if (!context.mounted) return;
-
-    if (!ambienteVM.dentroDeGeofence) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('⚠️ No estás en el laboratorio ${ambiente.nombre}'),
-          backgroundColor: Colors.orange,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    }
-
-    Navigator.of(context).pushNamed('/auditoria');
+    
+    // Cargar activos del ambiente
+    await context.read<ActivoViewModel>().cargarActivosPorAmbiente(ambiente.id);
+    
+    if (!context.mounted) return;
+    
+    // Navegar a detalles de activos (NO a auditoría)
+    Navigator.of(context).pushNamed('/activos-detalle');
   }
 }

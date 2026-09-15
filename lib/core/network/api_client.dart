@@ -1,6 +1,7 @@
 import 'package:http/http.dart' as http;
 import 'package:inventario_qr_app/core/constants/api_constants.dart';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 
 class ApiClient {
   final String _supabaseUrl = ApiConstants.supabaseUrl;
@@ -65,6 +66,25 @@ class ApiClient {
 
     print('📥 Status: ${response.statusCode}');
     print('📥 Response: ${response.body}');
+    
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      if (response.body.isEmpty) {
+        return {};
+      }
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Error: ${response.statusCode} - ${response.body}');
+    }
+  }
+
+  Future<dynamic> delete(String endpoint) async {
+    final url = Uri.parse('$_supabaseUrl$endpoint');
+    
+    debugPrint('🗑️ DELETE a: $url');
+    
+    final response = await http.delete(url, headers: _getHeaders());
+
+    debugPrint('📥 Status: ${response.statusCode}');
     
     if (response.statusCode == 200 || response.statusCode == 204) {
       if (response.body.isEmpty) {

@@ -45,8 +45,7 @@ class ActivoModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final json = {
       'uuid': uuid,
       'nombre': nombre,
       'tipo': tipo,
@@ -59,5 +58,12 @@ class ActivoModel {
       'imagen_url': imagenUrl,
       'observaciones': observaciones,
     };
+
+    // Solo incluir 'id' si no está vacío (para actualizar)
+    if (id.isNotEmpty) {
+      json['id'] = id;
+    }
+
+    return json;
   }
 }

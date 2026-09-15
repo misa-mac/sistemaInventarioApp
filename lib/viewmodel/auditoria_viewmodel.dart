@@ -10,6 +10,8 @@ class AuditoriaViewModel extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   int _escaneosCont = 0;
+  AuditoriaModel? _ultimaAuditoria;
+  List<DetalleAuditoriaModel> _movimientosRecientes = [];
 
   // Getters
   AuditoriaModel? get auditoriaActual => _auditoriaActual;
@@ -17,6 +19,8 @@ class AuditoriaViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   int get escaneosCont => _escaneosCont;
+  AuditoriaModel? get ultimaAuditoria => _ultimaAuditoria;
+  List<DetalleAuditoriaModel> get movimientosRecientes => _movimientosRecientes;
 
   Future<bool> iniciarAuditoria(
     String ambienteId,
@@ -142,5 +146,16 @@ class AuditoriaViewModel extends ChangeNotifier {
     _escaneosCont = 0;
     _error = null;
     notifyListeners();
+  }
+
+  Future<void> cargarReportes() async {
+    try {
+      _ultimaAuditoria = await _auditoriaRepository.getUltimaAuditoria();
+      _movimientosRecientes = await _auditoriaRepository.getMovimientosRecientes();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error cargando reportes: $e');
+      notifyListeners();
+    }
   }
 }

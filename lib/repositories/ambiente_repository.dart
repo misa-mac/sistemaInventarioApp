@@ -14,7 +14,7 @@ class AmbienteRepository {
       
       List<AmbienteModel> ambientes = [];
       if (response is List) {
-        ambientes = (response as List).map((json) => AmbienteModel.fromJson(json)).toList();
+        ambientes = (response).map((json) => AmbienteModel.fromJson(json)).toList();
       }
       
       // Cachear
@@ -38,8 +38,8 @@ class AmbienteRepository {
         '${ApiConstants.ambientesEndpoint}?id=eq.$ambienteId',
       );
       
-      if (response is List && (response as List).isNotEmpty) {
-        return AmbienteModel.fromJson((response as List)[0]);
+      if (response is List && (response).isNotEmpty) {
+        return AmbienteModel.fromJson((response)[0]);
       }
       return null;
     } catch (e) {
