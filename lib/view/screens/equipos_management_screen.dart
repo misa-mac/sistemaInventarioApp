@@ -11,6 +11,8 @@ class EquiposManagementScreen extends StatefulWidget {
   State<EquiposManagementScreen> createState() => _EquiposManagementScreenState();
 }
 
+
+//cambio pequeño
 class _EquiposManagementScreenState extends State<EquiposManagementScreen> {
   final ActivoRepository _activoRepository = ActivoRepository();
 
