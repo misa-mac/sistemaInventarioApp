@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:inventario_qr_app/viewmodel/activo_viewmodel.dart';
+import 'package:inventario_qr_app/viewmodel/auth_viewmodel.dart';
+import 'package:inventario_qr_app/core/services/permisos_service.dart';
 import 'package:inventario_qr_app/repositories/activo_repository.dart';
 import 'package:inventario_qr_app/models/activo_model.dart';
 
@@ -143,36 +145,61 @@ class _EquiposManagementScreenState extends State<EquiposManagementScreen> {
                       const SizedBox(height: 12),
 
                       // Botones de acción
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: () => _editarActivo(context, activo),
-                            icon: const Icon(Icons.edit, size: 18),
-                            label: const Text('Editar'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                            ),
-                          ),
-                          ElevatedButton.icon(
-                            onPressed: () => _confirmarEliminar(context, activo),
-                            icon: const Icon(Icons.delete, size: 18),
-                            label: const Text('Eliminar'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                            ),
-                          ),
-                        ],
+                      Consumer<AuthViewModel>(
+                        builder: (context, authVM, _) {
+                          final rol = authVM.usuario?.rol ?? 'tecnico';
+                          final puedeEditar = PermisosService.tienePermiso(rol, 'editar_equipos');
+                          final puedeEliminar = PermisosService.tienePermiso(rol, 'eliminar_equipos');
+
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              if (puedeEditar)
+                                ElevatedButton.icon(
+                                  onPressed: () => _editarActivo(context, activo),
+                                  icon: const Icon(Icons.edit, size: 18),
+                                  label: const Text('Editar'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                  ),
+                                ),
+                              if (puedeEliminar)
+                                ElevatedButton.icon(
+                                  onPressed: () => _confirmarEliminar(context, activo),
+                                  icon: const Icon(Icons.delete, size: 18),
+                                  label: const Text('Eliminar'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                  ),
+                                ),
+                              if (!puedeEditar && !puedeEliminar)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[300],
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    'Sin permisos',
+                                    style: TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -182,10 +209,19 @@ class _EquiposManagementScreenState extends State<EquiposManagementScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _crearNuevoActivo(context),
-        backgroundColor: Colors.green,
-        child: const Icon(Icons.add),
+      floatingActionButton: Consumer<AuthViewModel>(
+        builder: (context, authVM, _) {
+          final rol = authVM.usuario?.rol ?? 'tecnico';
+          final puedeCrear = PermisosService.tienePermiso(rol, 'crear_equipos');
+
+          return puedeCrear
+              ? FloatingActionButton(
+                  onPressed: () => _crearNuevoActivo(context),
+                  backgroundColor: Colors.green,
+                  child: const Icon(Icons.add),
+                )
+              : const SizedBox.shrink();
+        },
       ),
     );
   }

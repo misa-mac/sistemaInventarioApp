@@ -127,17 +127,43 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _handleLogin(BuildContext context, AuthViewModel authVM) async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    // Validar campos vacíos
+    if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor completa todos los campos')),
+        const SnackBar(
+          content: Text('Por favor completa todos los campos'),
+          backgroundColor: Colors.orange,
+        ),
       );
       return;
     }
 
-    final success = await authVM.login(
-      _emailController.text,
-      _passwordController.text,
-    );
+    // Validar formato email
+    if (!email.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Email inválido'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Validar longitud mínima de contraseña
+    if (password.length < 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('La contraseña debe tener al menos 8 caracteres'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final success = await authVM.login(email, password);
 
     if (success && context.mounted) {
       Navigator.of(context).pushReplacementNamed('/main');
