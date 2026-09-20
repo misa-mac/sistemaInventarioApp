@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:inventario_qr_app/viewmodel/auditoria_viewmodel.dart';
 import 'package:inventario_qr_app/viewmodel/activo_viewmodel.dart';
+import 'package:inventario_qr_app/core/services/reportes_pdf_service.dart';
+import 'package:inventario_qr_app/core/services/auditoria_pdf_service.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:inventario_qr_app/models/auditoria_model.dart';
+import 'package:inventario_qr_app/repositories/auditoria_repository.dart';
+import 'package:inventario_qr_app/models/ambiente_model.dart';
+import 'package:inventario_qr_app/viewmodel/ambiente_viewmodel.dart';
 
 class ReportesScreen extends StatefulWidget {
   const ReportesScreen({super.key});
@@ -343,6 +350,27 @@ class _ReportesScreenState extends State<ReportesScreen> {
           ],
         ),
       ),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            heroTag: 'pdf_auditoria',
+            onPressed: () => _descargarPdfAuditoriaPorFecha(context),
+            backgroundColor: Colors.orange,
+            tooltip: 'PDF Auditoría por Fecha',
+            child: const Icon(Icons.calendar_today),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton.extended(
+            heroTag: 'pdf_reportes',
+            onPressed: () => _descargarPdfReportes(),
+            backgroundColor: Colors.blue,
+            icon: const Icon(Icons.download),
+            label: const Text('Descargar PDF'),
+            foregroundColor: Colors.white,
+          ),
+        ],
+      ),
     );
   }
 
@@ -386,5 +414,258 @@ class _ReportesScreenState extends State<ReportesScreen> {
         ),
       ),
     );
+  }
+
+  void _descargarPdfReportes() async {
+    final rutaPersonalizada = await _seleccionarUbicacion();
+    
+    if (!mounted) return;
+
+    final auditoriaVM = context.read<AuditoriaViewModel>();
+    final activoVM = context.read<ActivoViewModel>();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('📄 Generando PDF...'),
+        backgroundColor: Colors.blue,
+      ),
+    );
+
+    await ReportesPdfService.generarPdfReportes(
+      ultimaAuditoria: auditoriaVM.ultimaAuditoria,
+      ultimoEscaneado: activoVM.ultimoEscaneado,
+      movimientosRecientes: auditoriaVM.movimientosRecientes,
+      activosNuevos: activoVM.activosNuevos,
+      activosDeBaja: activoVM.activosDeBaja,
+      rutaPersonalizada: rutaPersonalizada,
+    );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            rutaPersonalizada != null
+                ? '✅ PDF descargado en: $rutaPersonalizada'
+                : '✅ PDF descargado en Descargas',
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  void _descargarPdfAuditoriaPorFecha(BuildContext context) async {
+    final fechaSeleccionada = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2024),
+      lastDate: DateTime.now(),
+      locale: const Locale('es', 'ES'),
+    );
+
+    if (fechaSeleccionada == null || !context.mounted) return;
+
+    final auditoriaSeleccionada = await _obtenerAuditoriasDelDia(fechaSeleccionada);
+
+    if (auditoriaSeleccionada == null || !context.mounted) return;
+
+    final rutaPersonalizada = await _seleccionarUbicacion();
+
+    if (!context.mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('📄 Obteniendo datos...'),
+        backgroundColor: Colors.blue,
+      ),
+    );
+
+    try {
+      // Obtener nombre del ambiente desde BD
+      final auditoriaRepo = AuditoriaRepository();
+      final auditoriaDetalles = await auditoriaRepo.obtenerAuditoriaConDetalles(auditoriaSeleccionada.id);
+      
+      if (!context.mounted) return;
+
+      String ambienteNombre = 'Ambiente Desconocido';
+      if (auditoriaDetalles != null && auditoriaDetalles['ambiente_id'] != null) {
+        final ambienteVM = context.read<AmbienteViewModel>();
+        final ambiente = ambienteVM.ambientes
+            .firstWhere(
+              (a) => a.id == auditoriaDetalles['ambiente_id'],
+              orElse: () => AmbienteModel(
+                id: '',
+                nombre: 'Desconocido',
+                descripcion: '',
+                tieneInternet: false,
+                latitude: 0,
+                longitude: 0,
+                radioGeofence: 0,
+              ),
+            );
+        ambienteNombre = ambiente.nombre;
+      }
+
+      // Obtener IDs de activos escaneados en esa auditoría
+      final activosEscaneados = await auditoriaRepo.obtenerActivosEscaneadosDeAuditoria(
+        auditoriaSeleccionada.id,
+      );
+
+      if (!context.mounted) return;
+
+      // Cargar todos los activos del ambiente
+      await context.read<ActivoViewModel>().cargarActivosPorAmbiente(
+        auditoriaSeleccionada.ambienteId,
+      );
+
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('📄 Generando PDF...'),
+          backgroundColor: Colors.blue,
+        ),
+      );
+
+      final activos = context.read<ActivoViewModel>().activos;
+
+      await AuditoriaPdfService.generarPdfAuditoria(
+        auditoria: auditoriaSeleccionada,
+        activosDelAmbiente: activos,
+        activosEscaneados: activosEscaneados,
+        ambienteNombre: ambienteNombre,
+        tecnicoNombre: 'Usuario',
+        rutaPersonalizada: rutaPersonalizada,
+      );
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              rutaPersonalizada != null
+                  ? '✅ PDF descargado en: $rutaPersonalizada'
+                  : '✅ PDF descargado en Descargas',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<String?> _seleccionarUbicacion() async {
+    try {
+      final resultado = await FilePicker.platform.getDirectoryPath();
+      return resultado;
+    } catch (e) {
+      debugPrint('Error seleccionando ubicación: $e');
+      return null;
+    }
+  }
+
+  Future<AuditoriaModel?> _obtenerAuditoriasDelDia(DateTime fecha) async {
+    try {
+      final auditoriaRepository = AuditoriaRepository();
+      
+      debugPrint('🔍 Buscando auditorías para: ${fecha.toString().split(' ')[0]}');
+
+      // Obtener auditorías de esa fecha desde BD
+      final auditorias = await auditoriaRepository.obtenerAuditoriasDelDia(fecha);
+
+      if (auditorias.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'No hay auditorías para: ${fecha.toString().split(' ')[0]}',
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return null;
+      }
+
+      // Si solo hay una, retornarla directamente
+      if (auditorias.length == 1) {
+        return auditorias.first;
+      }
+
+      // Si hay varias, mostrar un diálogo para que el usuario seleccione
+      if (mounted) {
+        final seleccionada = await showDialog<AuditoriaModel>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Seleccionar Auditoría'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: auditorias.length,
+                itemBuilder: (context, index) {
+                  final auditoria = auditorias[index];
+                  return ListTile(
+                    title: Text('Auditoría ${index + 1}'),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Hora: ${auditoria.fechaInicio.hour.toString().padLeft(2, '0')}:${auditoria.fechaInicio.minute.toString().padLeft(2, '0')}',
+                        ),
+                        Text(
+                          'Equipos: ${auditoria.totalEncontrados}/${auditoria.totalEsperados}',
+                        ),
+                        Text(
+                          auditoria.totalEncontrados == auditoria.totalEsperados
+                              ? '✅ Completada'
+                              : '⚠️ Incompleta',
+                          style: TextStyle(
+                            color: auditoria.totalEncontrados == auditoria.totalEsperados
+                                ? Colors.green
+                                : Colors.orange,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    onTap: () => Navigator.pop(context, auditoria),
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancelar'),
+              ),
+            ],
+          ),
+        );
+
+        return seleccionada;
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error obteniendo auditorías: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return null;
+    }
   }
 }

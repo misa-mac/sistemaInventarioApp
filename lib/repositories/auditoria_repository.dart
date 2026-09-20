@@ -12,10 +12,10 @@ class AuditoriaRepository {
     int totalEsperados,
   ) async {
     try {
-      print('📋 Creando auditoría...');
-      print('Ambiente ID: $ambienteId');
-      print('Técnico ID: $tecnicoId');
-      print('Total esperados: $totalEsperados');
+      debugPrint('📋 Creando auditoría...');
+      debugPrint('Ambiente ID: $ambienteId');
+      debugPrint('Técnico ID: $tecnicoId');
+      debugPrint('Total esperados: $totalEsperados');
 
       final auditoria = AuditoriaModel(
         id: '',
@@ -31,16 +31,16 @@ class AuditoriaRepository {
         auditoria.toJson(),
       );
 
-      print('Respuesta de BD: $response');
+      debugPrint('Respuesta de BD: $response');
 
       // Si respuesta vacía, esperar a que Supabase retorne el registro
       if (response is Map) {
         if (response.containsKey('id') && response['id'] != null) {
-          print('✅ Auditoría creada con ID: ${response['id']}');
+          debugPrint('✅ Auditoría creada con ID: ${response['id']}');
           return AuditoriaModel.fromJson(response as Map<String, dynamic>);
         } else if (response.isEmpty) {
           // Consultar la auditoría recién creada
-          print('⏳ Esperando que Supabase genere el ID...');
+          debugPrint('⏳ Esperando que Supabase genere el ID...');
           await Future.delayed(const Duration(milliseconds: 500));
           
           // Buscar la auditoría más reciente de este técnico
@@ -49,16 +49,16 @@ class AuditoriaRepository {
           );
           
           if (recentResponse is List && recentResponse.isNotEmpty) {
-            print('✅ Auditoría encontrada: ${recentResponse[0]['id']}');
+            debugPrint('✅ Auditoría encontrada: ${recentResponse[0]['id']}');
             return AuditoriaModel.fromJson(recentResponse[0] as Map<String, dynamic>);
           }
         }
       }
 
-      print('❌ No se pudo crear auditoría');
+      debugPrint('❌ No se pudo crear auditoría');
       return null;
     } catch (e) {
-      print('Error creando auditoría: $e');
+      debugPrint('Error creando auditoría: $e');
       return null;
     }
   }
@@ -95,8 +95,8 @@ class AuditoriaRepository {
     int totalEncontrados,
   ) async {
     try {
-      print('🏁 Finalizando auditoría: $auditoriaId');
-      print('Total encontrados: $totalEncontrados');
+      debugPrint('🏁 Finalizando auditoría: $auditoriaId');
+      debugPrint('Total encontrados: $totalEncontrados');
       
       // Usar PATCH en lugar de POST para actualizar
       final response = await _apiClient.patch(
@@ -107,10 +107,10 @@ class AuditoriaRepository {
         },
       );
 
-      print('📥 Respuesta finalizar: $response');
+      debugPrint('📥 Respuesta finalizar: $response');
       return true;
     } catch (e) {
-      print('❌ Error finalizando auditoría: $e');
+      debugPrint('❌ Error finalizando auditoría: $e');
       return false;
     }
   }
@@ -164,6 +164,62 @@ class AuditoriaRepository {
       return movimientos;
     } catch (e) {
       debugPrint('Error obteniendo movimientos: $e');
+      return [];
+    }
+  }
+
+  Future<List<AuditoriaModel>> obtenerAuditoriasDelDia(DateTime fecha) async {
+    try {
+      final fechaInicio = DateTime(fecha.year, fecha.month, fecha.day);
+      final fechaFin = DateTime(fecha.year, fecha.month, fecha.day, 23, 59, 59);
+
+      final response = await _apiClient.get(
+        '${ApiConstants.auditoriasEndpoint}?fecha_inicio=gte.${fechaInicio.toIso8601String()}&fecha_inicio=lte.${fechaFin.toIso8601String()}&order=fecha_inicio.desc',
+      );
+
+      if (response is List) {
+        return response
+            .map((json) => AuditoriaModel.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
+
+      return [];
+    } catch (e) {
+      debugPrint('Error obteniendo auditorías del día: $e');
+      return [];
+    }
+  }
+  Future<Map<String, dynamic>?> obtenerAuditoriaConDetalles(String auditoriaId) async {
+    try {
+      final response = await _apiClient.get(
+        '${ApiConstants.auditoriasEndpoint}?id=eq.$auditoriaId',
+      );
+
+      if (response is List && response.isNotEmpty) {
+        return response[0] as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error obteniendo auditoría: $e');
+      return null;
+    }
+  }
+
+  Future<List<String>> obtenerActivosEscaneadosDeAuditoria(String auditoriaId) async {
+    try {
+      final response = await _apiClient.get(
+        '${ApiConstants.detalleAuditoriaEndpoint}?auditoria_id=eq.$auditoriaId',
+      );
+
+      List<String> activosIds = [];
+      if (response is List) {
+        activosIds = response
+            .map((item) => item['activo_id'] as String)
+            .toList();
+      }
+      return activosIds;
+    } catch (e) {
+      debugPrint('Error obteniendo activos escaneados: $e');
       return [];
     }
   }

@@ -8,6 +8,7 @@ import 'package:inventario_qr_app/viewmodel/ambiente_viewmodel.dart';
 import 'package:inventario_qr_app/viewmodel/activo_viewmodel.dart';
 import 'package:inventario_qr_app/viewmodel/auditoria_viewmodel.dart';
 import 'package:inventario_qr_app/view/widgets/auth_wrapper.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,6 +36,14 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         title: 'ITBM - Sistema de Inventario',
         theme: AppTheme.lightTheme,
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [
+          Locale('es', 'ES'), // Español, España
+        ],
         home: const AuthWrapper(),
         onGenerateRoute: AppRoutes.generateRoute,
         initialRoute: AppRoutes.login,

@@ -29,8 +29,8 @@ class ApiClient {
   Future<dynamic> post(String endpoint, Map<String, dynamic> body) async {
     final url = Uri.parse('$_supabaseUrl$endpoint');
     
-    print('📤 POST a: $url');
-    print('📦 Body: $body');
+    debugPrint('📤 POST a: $url');
+    debugPrint('📦 Body: $body');
     
     final response = await http.post(
       url,
@@ -38,12 +38,12 @@ class ApiClient {
       body: jsonEncode(body),
     );
 
-    print('📥 Status: ${response.statusCode}');
-    print('📥 Response: ${response.body}');
+    debugPrint('📥 Status: ${response.statusCode}');
+    debugPrint('📥 Response: ${response.body}');
     
     if (response.statusCode == 200 || response.statusCode == 201) {
       if (response.body.isEmpty) {
-        print('⚠️ Respuesta vacía');
+        debugPrint('⚠️ Respuesta vacía');
         return {};
       }
       return jsonDecode(response.body);
@@ -55,8 +55,8 @@ class ApiClient {
   Future<dynamic> patch(String endpoint, Map<String, dynamic> body) async {
     final url = Uri.parse('$_supabaseUrl$endpoint');
     
-    print('🔧 PATCH a: $url');
-    print('📦 Body: $body');
+    debugPrint('🔧 PATCH a: $url');
+    debugPrint('📦 Body: $body');
     
     final response = await http.patch(
       url,
@@ -64,8 +64,8 @@ class ApiClient {
       body: jsonEncode(body),
     );
 
-    print('📥 Status: ${response.statusCode}');
-    print('📥 Response: ${response.body}');
+    debugPrint('📥 Status: ${response.statusCode}');
+    debugPrint('📥 Response: ${response.body}');
     
     if (response.statusCode == 200 || response.statusCode == 204) {
       if (response.body.isEmpty) {

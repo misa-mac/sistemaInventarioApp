@@ -39,6 +39,8 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
     // Cargar activos del ambiente
     await context.read<AmbienteViewModel>().cargarAmbientes();
     
+    if (!mounted) return;
+    
     // Contar equipos del ambiente
     final activosVM = context.read<ActivoViewModel>();
     await activosVM.cargarActivosPorAmbiente(ambiente.id);

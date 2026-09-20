@@ -248,7 +248,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
                           null,
                         );
                         _isProcessing = false; // ← Resetear
-                        if (mounted) {
+                        if (context.mounted) {
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -351,6 +351,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
                       'no_esperado',
                       'Equipo no registrado en BD',
                     );
+                    if (!context.mounted) return;
                     Navigator.pop(context);
                     _isProcessing = false;
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -364,7 +365,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
                     
                     // ← AGREGAR ESTO: Cerrar modal después de 1.5 segundos
                     Future.delayed(const Duration(milliseconds: 1500), () {
-                      if (mounted && Navigator.canPop(context)) {
+                      if (context.mounted && Navigator.canPop(context)) {
                         Navigator.pop(context);
                       }
                     });
@@ -450,7 +451,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
               
               final success = await auditoriaVM.finalizarAuditoria();
               
-              if (!mounted) return; // ← Verificar antes de usar context
+              if (!context.mounted) return; // ← Verificar antes de usar context
               
               if (success) {
                 cameraController.dispose();

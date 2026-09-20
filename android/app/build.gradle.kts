@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "com.example.inventario_qr_app"
     compileSdk = 36
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

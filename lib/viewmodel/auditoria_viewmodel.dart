@@ -65,7 +65,7 @@ class AuditoriaViewModel extends ChangeNotifier {
     if (_auditoriaActual == null) return false;
 
     try {
-      print('📝 Registrando escaneo: $activoId');
+      debugPrint('📝 Registrando escaneo: $activoId');
       
       final resultado = await _auditoriaRepository.registrarDetalleAuditoria(
         _auditoriaActual!.id,
@@ -76,14 +76,14 @@ class AuditoriaViewModel extends ChangeNotifier {
 
       if (resultado) {
         _escaneosCont++;
-        print('✅ Escaneo registrado. Total: $_escaneosCont');
+        debugPrint('✅ Escaneo registrado. Total: $_escaneosCont');
         notifyListeners(); // ← CRÍTICO: Actualizar UI
         return true;
       }
       return false;
     } catch (e) {
       _error = 'Error registrando escaneo: $e';
-      print('❌ Error: $e');
+      debugPrint('❌ Error: $e');
       notifyListeners();
       return false;
     }
@@ -91,7 +91,7 @@ class AuditoriaViewModel extends ChangeNotifier {
 
   Future<bool> finalizarAuditoria() async {
     if (_auditoriaActual == null) {
-      print('❌ No hay auditoría activa');
+      debugPrint('❌ No hay auditoría activa');
       return false;
     }
 
@@ -99,16 +99,16 @@ class AuditoriaViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      print('🏁 Finalizando auditoría: ${_auditoriaActual!.id}');
-      print('Total escaneados: $_escaneosCont');
-      print('Ambiente ID: ${_auditoriaActual!.ambienteId}');
+      debugPrint('🏁 Finalizando auditoría: ${_auditoriaActual!.id}');
+      debugPrint('Total escaneados: $_escaneosCont');
+      debugPrint('Ambiente ID: ${_auditoriaActual!.ambienteId}');
       
       final resultado = await _auditoriaRepository.finalizarAuditoria(
         _auditoriaActual!.id,
         _escaneosCont,
       );
 
-      print('Resultado: $resultado');
+      debugPrint('Resultado: $resultado');
       
       if (resultado) {
         _auditoriaActual = _auditoriaActual!; // Mantener referencia
@@ -118,7 +118,7 @@ class AuditoriaViewModel extends ChangeNotifier {
       notifyListeners();
       return resultado;
     } catch (e) {
-      print('❌ Error finalizando: $e');
+      debugPrint('❌ Error finalizando: $e');
       _error = 'Error finalizando auditoría: $e';
       _isLoading = false;
       notifyListeners();

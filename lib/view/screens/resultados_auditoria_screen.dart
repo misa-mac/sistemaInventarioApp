@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:inventario_qr_app/viewmodel/auditoria_viewmodel.dart';
+import 'package:inventario_qr_app/core/services/auditoria_pdf_service.dart';
+import 'package:inventario_qr_app/viewmodel/activo_viewmodel.dart';
+import 'package:inventario_qr_app/viewmodel/ambiente_viewmodel.dart';
+import 'package:file_picker/file_picker.dart';
 
 class ResultadosAuditoriaScreen extends StatefulWidget {
   const ResultadosAuditoriaScreen({super.key});
@@ -146,18 +150,80 @@ class _ResultadosAuditoriaScreenState extends State<ResultadosAuditoriaScreen> {
                 const SizedBox(height: 24),
                 
                 // Botón para volver a inicio
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      context.read<AuditoriaViewModel>().limpiarAuditoria();
-                      Navigator.of(context).pushReplacementNamed('/main');
-                    },
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final rutaPersonalizada = await _seleccionarUbicacion();
+                          if (!context.mounted) return;
+
+                          final auditoriaVM = context.read<AuditoriaViewModel>();
+                          final activoVM = context.read<ActivoViewModel>();
+                          final ambienteVM = context.read<AmbienteViewModel>();
+                          
+                          if (auditoriaVM.auditoriaActual != null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('📄 Generando PDF...'),
+                                backgroundColor: Colors.blue,
+                              ),
+                            );
+
+                            final activosEscaneados = auditoriaVM.detalles
+                                .where((m) => m.estado == 'presente')
+                                .map((m) => m.activoId)
+                                .toList();
+
+                            await AuditoriaPdfService.generarPdfAuditoria(
+                              auditoria: auditoriaVM.auditoriaActual!,
+                              activosDelAmbiente: activoVM.activos,
+                              activosEscaneados: activosEscaneados,
+                              ambienteNombre: ambienteVM.ambienteSeleccionado?.nombre ?? 'Desconocido',
+                              tecnicoNombre: 'Usuario', // Obtener del auth si está disponible
+                              rutaPersonalizada: rutaPersonalizada,
+                            );
+
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    rutaPersonalizada != null
+                                        ? '✅ PDF descargado en: $rutaPersonalizada'
+                                        : '✅ PDF descargado en Descargas',
+                                  ),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.download),
+                        label: const Text('Descargar PDF'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
                     ),
-                    child: const Text('Ir al Inicio'),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          context.read<AuditoriaViewModel>().limpiarAuditoria();
+                          Navigator.of(context).pushReplacementNamed('/main');
+                        },
+                        icon: const Icon(Icons.home),
+                        label: const Text('Ir al Inicio'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -196,5 +262,15 @@ class _ResultadosAuditoriaScreenState extends State<ResultadosAuditoriaScreen> {
         ],
       ),
     );
+  }
+
+  Future<String?> _seleccionarUbicacion() async {
+    try {
+      final resultado = await FilePicker.platform.getDirectoryPath();
+      return resultado;
+    } catch (e) {
+      debugPrint('Error seleccionando ubicación: $e');
+      return null;
+    }
   }
 }
