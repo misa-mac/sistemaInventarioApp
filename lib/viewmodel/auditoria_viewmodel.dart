@@ -158,4 +158,57 @@ class AuditoriaViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<void> limpiarDuplicados() async {
+    if (_auditoriaActual == null) return;
+
+    try {
+      debugPrint('🔍 Buscando duplicados...');
+      
+      // Obtener todos los detalles de la auditoría
+      final detalles = await _auditoriaRepository.getDetallesAuditoria(_auditoriaActual!.id);
+      
+      // Contar ocurrencias de cada activo
+      final Map<String, int> conteoPorActivo = {};
+      final Map<String, List<String>> detallesIds = {};
+      
+      for (var detalle in detalles) {
+        final activoId = detalle.activoId;
+        conteoPorActivo[activoId] = (conteoPorActivo[activoId] ?? 0) + 1;
+        
+        if (!detallesIds.containsKey(activoId)) {
+          detallesIds[activoId] = [];
+        }
+        detallesIds[activoId]!.add(detalle.id);
+      }
+      
+      // Eliminar duplicados (mantener solo el primero)
+      List<String> idsAEliminar = [];
+      for (var activoId in conteoPorActivo.keys) {
+        if (conteoPorActivo[activoId]! > 1) {
+          final ids = detallesIds[activoId]!;
+          
+          // Agregar a la lista de eliminación todos excepto el primero
+          for (int i = 1; i < ids.length; i++) {
+            idsAEliminar.add(ids[i]);
+          }
+        }
+      }
+      
+      int duplicadosEliminados = idsAEliminar.length;
+      if (idsAEliminar.isNotEmpty) {
+        debugPrint('🗑️ Eliminando $duplicadosEliminados duplicados en lote...');
+        await _auditoriaRepository.eliminarDetallesAuditoriaEnLote(idsAEliminar);
+      }
+      
+      debugPrint('✅ Duplicados eliminados: $duplicadosEliminados');
+      
+      // Recalcular contador
+      _escaneosCont = detalles.length - duplicadosEliminados;
+      notifyListeners();
+      
+    } catch (e) {
+      debugPrint('❌ Error limpiando duplicados: $e');
+    }
+  }
 }

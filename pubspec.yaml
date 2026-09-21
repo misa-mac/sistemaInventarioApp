@@ -58,7 +58,7 @@ dependencies:
   printing: ^5.11.0
   path_provider: ^2.1.0
   file_picker: ^8.1.0
-  vibration: ^1.8.0
+  vibration: ^3.2.1
   audioplayers: ^5.2.0
 
 dev_dependencies:
@@ -67,6 +67,7 @@ dev_dependencies:
   flutter_lints: ^2.0.0
   hive_generator: ^2.0.0
   build_runner: ^2.4.6
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -82,6 +83,7 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/sounds/beep_success.mp3
   
   fonts:
     - family: Poppins
@@ -89,3 +91,8 @@ flutter:
         - asset: assets/fonts/Poppins-Regular.ttf
         - asset: assets/fonts/Poppins-Bold.ttf
           weight: 700
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/logo_itbm.png"

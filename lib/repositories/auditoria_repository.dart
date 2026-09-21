@@ -223,4 +223,38 @@ class AuditoriaRepository {
       return [];
     }
   }
+
+  Future<bool> eliminarDetalleAuditoria(String detalleId) async {
+    try {
+      await _apiClient.delete(
+        '${ApiConstants.detalleAuditoriaEndpoint}?id=eq.$detalleId',
+      );
+      return true;
+    } catch (e) {
+      debugPrint('Error eliminando detalle de auditoría: $e');
+      return false;
+    }
+  }
+
+  Future<bool> eliminarDetallesAuditoriaEnLote(List<String> detalleIds) async {
+    if (detalleIds.isEmpty) return true;
+    
+    try {
+      // Chunking para evitar errores de URI demasiado larga
+      const int chunkSize = 50;
+      for (var i = 0; i < detalleIds.length; i += chunkSize) {
+        final end = (i + chunkSize < detalleIds.length) ? i + chunkSize : detalleIds.length;
+        final chunk = detalleIds.sublist(i, end);
+        final idsString = chunk.join(',');
+        
+        await _apiClient.delete(
+          '${ApiConstants.detalleAuditoriaEndpoint}?id=in.($idsString)',
+        );
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error eliminando detalles de auditoría en lote: $e');
+      return false;
+    }
+  }
 }

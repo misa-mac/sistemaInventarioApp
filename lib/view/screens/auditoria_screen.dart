@@ -148,7 +148,7 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      Navigator.of(context).pushNamed('/qr-scan');
+                      Navigator.of(context).pushNamed('/qr-scan-optimizado');
                     },
                     icon: const Icon(Icons.qr_code_2),
                     label: const Text('Escanear QR'),
