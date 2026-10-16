@@ -1,5 +1,7 @@
 const AuditLog = require('../models/AuditLog');
 
+
+//prueba de cambio
 exports.create = async (req, res) => {
   try {
     const { usuario_id, accion, recurso, recurso_id, resultado, detalles, ip_address, user_agent } = req.body;
