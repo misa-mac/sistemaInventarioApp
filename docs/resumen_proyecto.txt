@@ -1,0 +1,148 @@
+===========================================================
+RESUMEN DEL PROYECTO: SISTEMA DE INVENTARIO ITBM v2
+===========================================================
+
+1. REINICIO DEL PROYECTO (Clean Slate)
+-----------------------------------------------------------
+Debido a conflictos con dependencias obsoletas y configuraciones heredadas (PWA, Supabase), tomamos la decisión de borrar todo el código antiguo y reconstruir el sistema desde cero (versión 2.0). Esto garantizó una arquitectura limpia, profesional y libre de errores.
+
+2. ARQUITECTURA DEL BACKEND (API RESTful)
+-----------------------------------------------------------
+Se construyó un backend robusto enfocado en la integridad de datos:
+- Stack Tecnológico: Node.js, Express, PostgreSQL.
+- ORM (Sequelize): Reemplazamos las consultas SQL manuales por modelos orientados a objetos (Usuario, Activo, Ambiente, Movimiento).
+- Sincronización Automática: La base de datos y sus tablas se crean y actualizan automáticamente al arrancar el servidor mediante `sequelize.sync()`.
+- Validaciones: Se implementó `Joi` en los controladores para asegurar que los datos enviados por el cliente tengan el formato correcto antes de tocar la base de datos.
+- Seguridad: Autenticación mediante JWT (JSON Web Tokens) y contraseñas encriptadas con `bcrypt`.
+
+3. ARQUITECTURA DEL FRONTEND (React + Vite)
+-----------------------------------------------------------
+Se construyó un frontend ultrarrápido y reactivo:
+- Stack Tecnológico: React 18 inicializado con Vite (reemplazando a Create React App/Scripts para mayor velocidad).
+- Enrutamiento: React Router DOM para navegación sin recargar la página.
+- Estado Global: Creación de un `AuthContext` para mantener la sesión del usuario a lo largo de toda la aplicación utilizando el LocalStorage.
+- Consumo de API: Configuración de Axios (`api.js`) con un interceptor que inyecta automáticamente el Token JWT en cada petición al backend.
+
+4. SISTEMA DE DISEÑO Y UX (Modern & Vibrant UI)
+-----------------------------------------------------------
+- Tailwind CSS: Se configuró con una paleta de colores moderna y vibrante (Vibrant Blue, Sky Blue, Violet) reemplazando diseños lúgubres.
+- Tipografía: Se integró la fuente "Inter" (Google Fonts) para un diseño corporativo limpio.
+- Layouts Construidos:
+  * Panel de Control (Dashboard): Pantalla de inicio dinámica con tarjetas de resumen métrico y accesos rápidos.
+  * Login Page: Tarjeta de autenticación con integración visual del logo institucional.
+  * Galería de Inventario: Reemplazó a la antigua tabla por una "Cuadrícula/Galería" visual donde cada activo muestra su foto, estado y acciones directas (Ver Detalles, Imprimir QR, Editar).
+  * Notificaciones Inteligentes: Campanita interactiva que avisa si existen equipos "Dañados".
+
+5. MÓDULOS COMPLETADOS (Funcionalidades Clave)
+-----------------------------------------------------------
+- **Gestión de Activos y Archivos:** CRUD completo. Se implementó `multer` en el backend para gestionar subidas de fotos y `browser-image-compression` en el frontend para comprimir las imágenes en el navegador antes de enviarlas, optimizando el espacio del servidor.
+- **Generación e Impresión de QR:** Lógica estricta de codificación oficial `XYZAACC-GG`. Sistema de impresión nativo (volcado de DOM a ventana) que garantiza la impresión exacta de etiquetas de 3x3cm (ignorando fallos de librerías de terceros).
+- **Reportes Estadísticos:** Gráficos visuales integrados con `recharts`. Motores de exportación directa a Excel (mediante `xlsx`) y a PDF corporativo (mediante `jspdf` y `jspdf-autotable`).
+- **Gestión de Infraestructura (Ambientes):** CRUD para crear y administrar laboratorios/talleres, dictando el código `CC` del inventario.
+- **Configuración (Catálogos):** CRUD para tipos de activos (categorías de hardware), definiendo dinámicamente los códigos `AA`. Pantalla de visualización de parámetros bloqueados (`X=1`, `YZ=50`).
+- **Roles y Permisos (RBAC):** CRUD de usuarios. Protección severa de rutas en el backend y frontend (solo el rol 'admin' puede crear/borrar usuarios o acceder al panel). Contraseñas encriptadas nativamente con `bcrypt`.
+
+- **Historial de Eventos (Movimientos, Traslados y Mantenimientos):** Interfaz unificada (`HistorialPage.jsx`) para registrar cualquier suceso en la vida de un activo. Soporta:
+  * Traslados: Actualiza automáticamente el `ambiente_id` del equipo.
+  * Mantenimientos: Permite registrar el costo y actualizar el estado del equipo a "Dañado" o regresarlo a "Activo" (reparado).
+  * Bajas: Permite sacar de circulación permanentemente un equipo, cambiando su estado a "Inactivo".
+  Incluye buscador inteligente de hardware y la posibilidad de revertir (eliminar) eventos del historial.
+- **Alertas Avanzadas y Notificaciones:** Nuevo sistema de notificaciones reales (con tabla `Notificacion`). Detecta eventos como Bajas o Mantenimientos y alerta al instante mediante la campanita de la UI, con posibilidad de "marcar como leídas". Además, genera alertas automáticas de sistema (warning) si existen equipos dañados que requieren reparación.
+
+6. DIRECTORIO DEL PROYECTO
+-----------------------------------------------------------
+sistema-inventario-itbm/
+├── backend/                  # API REST (Node.js + Express)
+│   ├── index.js              # Archivo principal de entrada
+│   ├── package.json          # Dependencias (express, sequelize, pg, multer, jsonwebtoken, etc.)
+│   ├── database.js           # Conexión a PostgreSQL
+│   ├── src/
+│   │   ├── controllers/      # Lógica de negocio (auth, inventario, reportes, usuarios, movimientos, notificaciones, etc.)
+│   │   ├── middleware/       # Middlewares (upload.js para imágenes)
+│   │   ├── models/           # Modelos Sequelize (Activo, Ambiente, TipoActivo, Usuario, Movimiento, Notificacion)
+│   │   └── routes/           # Rutas API protegidas
+│   └── uploads/              # Almacenamiento local de fotos de activos
+└── frontend/                 # Interfaz de Usuario (React + Vite)
+    ├── index.html            # Plantilla base
+    ├── package.json          # Dependencias (react, recharts, xlsx, jspdf, lucide-react, etc.)
+    ├── tailwind.config.js    # Configuración de diseño y colores vibrantes
+    ├── vite.config.js        # Configuración del empaquetador
+    ├── public/
+    │   └── logo.png          # Logo de la institución
+    └── src/
+        ├── index.css         # Estilos globales y fuente Inter
+        ├── App.jsx           # Enrutamiento, Dashboard Layout y Sidebar
+        ├── main.jsx          # Render principal
+        ├── context/          # Estados globales (AuthContext)
+        ├── services/         # Instancia Axios (api.js)
+        ├── components/       # Componentes reusables (HardwareFormModal, QRPrintModal)
+        └── pages/            # Vistas (Dashboard, Login, Inventario, Reportes, Ambientes, HistorialPage, etc.)
+
+7. ESTADO ACTUAL (Fase 1 y Fase 2 Base Completadas)
+-----------------------------------------------------------
+El proyecto v2.0 ha completado exitosamente su Roadmap original (Fase 1) y ha integrado con éxito los módulos de gestión de hardware (Fase 2: Movimientos, Mantenimientos y Alertas Avanzadas). Ambos entornos (Frontend y Backend) están robustos, acoplados y listos para su uso institucional real.
+
+8. ROADMAP (Trabajo Futuro)
+-----------------------------------------------------------
+Para escalar el sistema a un nivel superior, queda pendiente el siguiente módulo externo:
+- **Módulo de Auditorías (App Móvil / Sistema Externo):** Sistema para escanear masivamente códigos QR con un teléfono celular o lector externo, y conciliar automáticamente los equipos físicos vs. la base de datos para generar actas de sobrantes y faltantes de forma automatizada. (El estado del hardware ya está preparado para esto, pero requiere desarrollo de un cliente de escáner).
+
+9. ESTRUCTURA DE LA BASE DE DATOS (ESQUEMA RELACIONAL)
+-----------------------------------------------------------
+La base de datos PostgreSQL está normalizada y gestionada por Sequelize. Consta de las siguientes tablas principales:
+
+1. Usuarios
+   - id (UUID, PK)
+   - nombre_completo (String)
+   - email (String, Unique)
+   - password (String, Hash)
+   - rol (Enum: 'admin', 'tecnico', 'espectador')
+
+2. TipoActivos (Categorías de hardware)
+   - id (UUID, PK)
+   - nombre (String, Unique)
+   - codigo (Integer, 2 dígitos para el QR "AA")
+
+3. Ambientes (Laboratorios, Talleres, Oficinas)
+   - id (UUID, PK)
+   - nombre (String)
+   - codigo (Integer, 2 dígitos para el QR "CC")
+   - ubicacion (String)
+   - descripcion (Text)
+
+4. Activos (Equipos y Hardware)
+   - id (UUID, PK)
+   - codigo_activo (String, Unique, Formato: XYZAACC-GG)
+   - numero_correlativo (Integer)
+   - tipo_activo_id (UUID, FK -> TipoActivos)
+   - ambiente_id (UUID, FK -> Ambientes)
+   - origen (String)
+   - especificacion_origen (String)
+   - descripcion (Text)
+   - responsable (String)
+   - fecha_ingreso (Date)
+   - valor (Decimal)
+   - imagen (String, Ruta archivo)
+   - estado (Enum: 'Activo', 'Inactivo', 'Dañado')
+
+5. Movimientos (Historial de Traslados, Mantenimientos y Bajas)
+   - id (UUID, PK)
+   - tipo_evento (String: 'traslado', 'mantenimiento', 'baja')
+   - activo_id (UUID, FK -> Activos)
+   - usuario_id (UUID, FK -> Usuarios)
+   - ambiente_origen_id (UUID, FK -> Ambientes)
+   - ambiente_destino_id (UUID, FK -> Ambientes, nullable)
+   - estado_anterior (String)
+   - estado_nuevo (String)
+   - costo_mantenimiento (Decimal, nullable)
+   - observaciones (Text)
+   - created_at (Date)
+
+6. Notificaciones (Alertas del sistema)
+   - id (UUID, PK)
+   - usuario_id (UUID, FK -> Usuarios, nullable para globales)
+   - titulo (String)
+   - mensaje (Text)
+   - tipo (String: 'info', 'warning', 'error', 'success')
+   - leida (Boolean, default: false)
+   - created_at (Date)
