@@ -1,6 +1,14 @@
 class PermisosService {
-  // Definir permisos por rol
+  // Definir permisos por rol (conforme al ENUM PostgreSQL: 'admin', 'tecnico', 'auditor')
   static const Map<String, Map<String, bool>> permisosPorRol = {
+    'admin': {
+      'ver_equipos': true,
+      'crear_equipos': true,
+      'editar_equipos': true,
+      'eliminar_equipos': true,
+      'ver_auditorias': true,
+      'crear_auditorias': true,
+    },
     'administrador': {
       'ver_equipos': true,
       'crear_equipos': true,
@@ -29,13 +37,17 @@ class PermisosService {
 
   // Verificar si un rol tiene permisos para una acción
   static bool tienePermiso(String rol, String accion) {
-    final permisos = permisosPorRol[rol.toLowerCase()];
+    String cleanRol = rol.toLowerCase().trim();
+    if (cleanRol == 'administrador') cleanRol = 'admin';
+    final permisos = permisosPorRol[cleanRol];
     if (permisos == null) return false;
     return permisos[accion] ?? false;
   }
 
   // Obtener todos los permisos de un rol
   static Map<String, bool> obtenerPermisosDelRol(String rol) {
-    return permisosPorRol[rol.toLowerCase()] ?? {};
+    String cleanRol = rol.toLowerCase().trim();
+    if (cleanRol == 'administrador') cleanRol = 'admin';
+    return permisosPorRol[cleanRol] ?? {};
   }
 }

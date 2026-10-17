@@ -45,7 +45,10 @@ const auth = async (req, res, next) => {
     }
 
     // Normalizar rol a minúsculas conforme al ENUM ('admin', 'tecnico', 'auditor')
-    const rolNormalizado = (user.rol || '').toLowerCase().trim();
+    let rolNormalizado = (user.rol || '').toLowerCase().trim();
+    if (rolNormalizado === 'administrador') {
+      rolNormalizado = 'admin';
+    }
 
     req.user = {
       id: user.id,

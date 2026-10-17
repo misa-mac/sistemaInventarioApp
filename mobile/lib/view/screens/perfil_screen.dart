@@ -224,10 +224,25 @@ class PerfilScreen extends StatelessWidget {
     );
   }
 
-  bool _puedeAuditar(String rol) => rol == 'administrador' || rol == 'auditor';
-  bool _puedeMovimientos(String rol) => rol != 'auditor';
-  bool _puedeCrear(String rol) => rol == 'administrador';
-  bool _esAdmin(String rol) => rol == 'administrador';
+  bool _puedeAuditar(String rol) {
+    final r = rol.toLowerCase().trim();
+    return r == 'admin' || r == 'administrador' || r == 'auditor';
+  }
+
+  bool _puedeMovimientos(String rol) {
+    final r = rol.toLowerCase().trim();
+    return r != 'auditor';
+  }
+
+  bool _puedeCrear(String rol) {
+    final r = rol.toLowerCase().trim();
+    return r == 'admin' || r == 'administrador';
+  }
+
+  bool _esAdmin(String rol) {
+    final r = rol.toLowerCase().trim();
+    return r == 'admin' || r == 'administrador';
+  }
 
   void _handleLogout(BuildContext context) {
     showDialog(

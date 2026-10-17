@@ -160,7 +160,8 @@ const UsuariosPage = () => {
   const [editItem, setEditItem] = useState(null);
 
   useEffect(() => {
-    if (user?.rol === 'admin') {
+    const rol = (user?.rol || '').toLowerCase().trim();
+    if (rol === 'admin' || rol === 'administrador') {
       fetchUsuarios();
     } else {
       setLoading(false);
@@ -201,7 +202,8 @@ const UsuariosPage = () => {
     setIsModalOpen(true);
   };
 
-  if (user?.rol !== 'admin') {
+  const rolActual = (user?.rol || '').toLowerCase().trim();
+  if (rolActual !== 'admin' && rolActual !== 'administrador') {
     return (
       <div className="h-full flex flex-col items-center justify-center p-8 text-center animate-fade-in">
         <ShieldAlert size={64} className="text-error mb-4 opacity-80" />

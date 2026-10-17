@@ -52,7 +52,7 @@ class AuthViewModel extends ChangeNotifier {
       notifyListeners();
       return true;
     } else {
-      _error = 'Credenciales inválidas';
+      _error = _authRepository.lastError ?? 'Credenciales inválidas';
       
       // Registrar intento fallido (A09)
       await auditLog.registrarAccion(

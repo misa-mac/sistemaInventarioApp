@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const dotenv = require('dotenv');
 const { sequelize, connectDB } = require('./database');
+const { validateAppSecurity } = require('./src/config/securityValidator');
 
 // Importar Modelos para registrarlos antes del sync
 require('./src/models/Usuario');
@@ -68,6 +69,9 @@ const startServer = async () => {
   } catch (err) {
     console.warn('⚠️ Nota sobre sincronización Sequelize:', err.message);
   }
+
+  // Validación estricta de seguridad Deny-By-Default (Regla 2)
+  validateAppSecurity(app);
 
   app.listen(PORT, () => {
     console.log(`✅ Servidor corriendo en puerto ${PORT}`);

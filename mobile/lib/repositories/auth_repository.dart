@@ -6,12 +6,15 @@ import 'package:flutter/foundation.dart';
 
 class AuthRepository {
   final ApiClient _apiClient = ApiClient();
+  String? lastError;
 
   Future<UsuarioModel?> login(String email, String password) async {
     try {
+      lastError = null;
       debugPrint('🔐 Intentando login en servidor PostgreSQL: $email');
       
       if (email.isEmpty || password.isEmpty) {
+        lastError = 'Email o contraseña vacíos';
         debugPrint('❌ Email o contraseña vacíos');
         return null;
       }
@@ -44,10 +47,21 @@ class AuthRepository {
         return usuario;
       }
       
+      lastError = 'Respuesta de login inválida';
       debugPrint('❌ Respuesta de login inválida');
       return null;
     } catch (e) {
       debugPrint('❌ Error en login con servidor: $e');
+      final str = e.toString();
+      if (str.contains('Connection refused') || str.contains('SocketException')) {
+        lastError = 'No se pudo conectar al servidor. Revisa que el backend esté iniciado.';
+      } else if (str.contains('401')) {
+        lastError = 'Credenciales inválidas (email o contraseña incorrectos)';
+      } else if (str.contains('403')) {
+        lastError = 'Usuario inactivo';
+      } else {
+        lastError = 'Error de conexión: $e';
+      }
       return null;
     }
   }

@@ -42,7 +42,16 @@ const authorize = (action) => {
       return res.status(401).json({ message: 'Acceso no autenticado.' });
     }
 
-    const userRole = req.user.rol;
+    // Normalizar rol a minúsculas conforme al ENUM ('admin', 'tecnico', 'auditor')
+    let userRole = (req.user.rol || '').toLowerCase().trim();
+    if (userRole === 'administrador') {
+      userRole = 'admin';
+    }
+
+    // Regla de Rol Admin: acceso total a todas las operaciones del sistema
+    if (userRole === 'admin') {
+      return next();
+    }
 
     // Verificar si el rol está permitido para esta acción
     if (!allowedRoles.includes(userRole)) {
@@ -60,7 +69,14 @@ const authorize = (action) => {
     if (userRole === 'auditor' && ['auditorias:detalle', 'auditorias:finalizar', 'auditorias:sync'].includes(action)) {
       let auditoriaId = req.params?.id;
       if (!auditoriaId && action === 'auditorias:sync') {
-        auditoriaId = req.body?.auditoria_id;
+        auditoriaId = req.body?.auditoria_id || (Array.isArray(req.body) ? req.body[0]?.auditoria_id : null) || (req.body?.detalles && req.body.detalles[0]?.auditoria_id);
+      }
+      if (!auditoriaId && req.params?.detalleId) {
+        try {
+          const DetalleAuditoria = require('../models/DetalleAuditoria');
+          const detalle = await DetalleAuditoria.findByPk(req.params.detalleId);
+          if (detalle) auditoriaId = detalle.auditoria_id;
+        } catch (_) {}
       }
 
       if (auditoriaId) {
@@ -92,6 +108,7 @@ const authorize = (action) => {
     next();
   };
 
+  middleware._isAuthorize = true;
   middleware._action = action; // Marca identificadora para el validador de deny-by-default
   return middleware;
 };

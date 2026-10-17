@@ -8,7 +8,10 @@ const { Op } = require('sequelize');
 exports.create = async (req, res) => {
   try {
     const { ambiente_id, total_esperados, observaciones, tecnico_id, auditor_id } = req.body;
-    const auditorId = auditor_id || tecnico_id || req.user?.id;
+    let finalAuditorId = req.user?.id;
+    if (req.user?.rol === 'admin' && (auditor_id || tecnico_id)) {
+      finalAuditorId = auditor_id || tecnico_id;
+    }
 
     if (!ambiente_id) {
       return res.status(400).json({ message: 'ambiente_id es requerido' });
@@ -16,7 +19,7 @@ exports.create = async (req, res) => {
 
     const nueva = await Auditoria.create({
       ambiente_id,
-      auditor_id: auditorId,
+      auditor_id: finalAuditorId,
       total_esperados: total_esperados || 0,
       total_encontrados: 0,
       total_faltantes: 0,
@@ -258,5 +261,82 @@ exports.getMovimientosRecientes = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error interno del servidor' });
+  }
+};
+
+exports.sync = async (req, res) => {
+  try {
+    const { auditoria_id, detalles } = req.body;
+    const items = Array.isArray(detalles) ? detalles : (Array.isArray(req.body) ? req.body : []);
+    const audId = auditoria_id || (items[0] && items[0].auditoria_id) || req.params?.id;
+
+    if (!audId) {
+      return res.status(400).json({ message: 'auditoria_id es requerido para sincronizar' });
+    }
+
+    const auditoria = await Auditoria.findByPk(audId);
+    if (!auditoria) {
+      return res.status(404).json({ message: 'Auditoría no encontrada' });
+    }
+
+    const creados = [];
+    for (const item of items) {
+      let normEstado = (item.estado || 'presente').toString().toLowerCase().trim();
+      if (!['presente', 'faltante', 'no_esperado'].includes(normEstado)) {
+        normEstado = 'presente';
+      }
+
+      let activoId = item.activo_id;
+      let qr = item.codigo_qr_escaneado;
+
+      if (!qr && activoId) {
+        const act = await Activo.findByPk(activoId);
+        if (act) qr = act.codigo_activo;
+      }
+      if (!activoId && qr && normEstado !== 'no_esperado') {
+        const isUuidVal = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qr);
+        const act = await Activo.findOne({
+          where: isUuidVal ? { [Op.or]: [{ id: qr }, { codigo_activo: qr }] } : { codigo_activo: qr }
+        });
+        if (act) {
+          activoId = act.id;
+          qr = act.codigo_activo;
+        }
+      }
+
+      if (normEstado !== 'no_esperado' && !activoId) normEstado = 'no_esperado';
+      if (normEstado !== 'faltante' && !qr) qr = 'SIN_CODIGO';
+
+      const d = await DetalleAuditoria.create({
+        auditoria_id: audId,
+        activo_id: activoId || null,
+        codigo_qr_escaneado: qr || null,
+        estado: normEstado,
+        observacion: item.observacion || null,
+        fecha_escaneo: item.fecha_escaneo ? new Date(item.fecha_escaneo) : new Date(),
+        sincronizado: true
+      });
+      creados.push(d);
+    }
+
+    // Actualizar conteos
+    const encontrados = await DetalleAuditoria.count({ where: { auditoria_id: audId, estado: 'presente' } });
+    const faltantes = await DetalleAuditoria.count({ where: { auditoria_id: audId, estado: 'faltante' } });
+    const noEsperados = await DetalleAuditoria.count({ where: { auditoria_id: audId, estado: 'no_esperado' } });
+
+    await auditoria.update({
+      total_encontrados: encontrados,
+      total_faltantes: faltantes,
+      total_no_esperados: noEsperados
+    });
+
+    res.json({
+      message: 'Sincronización completada exitosamente',
+      sincronizados: creados.length,
+      auditoria
+    });
+  } catch (error) {
+    console.error('Error al sincronizar auditoría:', error);
+    res.status(500).json({ message: 'Error interno en sincronización: ' + error.message });
   }
 };
