@@ -8,10 +8,12 @@ class HiveManager {
   static Future<void> initHive() async {
     await Hive.initFlutter();
     
-    // Abrir boxes
-    await Hive.openBox(_activosBox);
-    await Hive.openBox(_auditoriasBox);
-    await Hive.openBox(_sessionBox);
+    // Abrir boxes en paralelo para reducir el tiempo de I/O en arranque
+    await Future.wait([
+      Hive.openBox(_sessionBox),
+      Hive.openBox(_activosBox),
+      Hive.openBox(_auditoriasBox),
+    ]);
   }
 
   static Box getActivosBox() => Hive.box(_activosBox);

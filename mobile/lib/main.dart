@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:provider/provider.dart';
 import 'package:inventario_qr_app/core/hive/hive_manager.dart';
 import 'package:inventario_qr_app/core/utils/app_theme.dart';
@@ -11,9 +12,10 @@ import 'package:inventario_qr_app/view/widgets/auth_wrapper.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   
-  // Inicializar Hive
+  // Inicializar almacenamiento local Hive
   await HiveManager.initHive();
   
   runApp(const MyApp());
@@ -46,7 +48,6 @@ class MyApp extends StatelessWidget {
         ],
         home: const AuthWrapper(),
         onGenerateRoute: AppRoutes.generateRoute,
-        initialRoute: AppRoutes.login,
       ),
     );
   }

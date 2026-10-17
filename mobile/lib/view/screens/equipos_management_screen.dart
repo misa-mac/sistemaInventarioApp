@@ -56,14 +56,27 @@ class _EquiposManagementScreenState extends State<EquiposManagementScreen> {
       ),
       body: Consumer<ActivoViewModel>(
         builder: (context, activoVM, _) {
+          if (activoVM.isLoading) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(strokeWidth: 2.5),
+                  SizedBox(height: 12),
+                  Text('Cargando equipos...'),
+                ],
+              ),
+            );
+          }
+
           if (activoVM.activos.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.inventory_2,
-                    size: 80,
+                    Icons.inventory_2_outlined,
+                    size: 64,
                     color: Colors.grey[400],
                   ),
                   const SizedBox(height: 16),
@@ -74,13 +87,19 @@ class _EquiposManagementScreenState extends State<EquiposManagementScreen> {
                       color: Colors.grey[600],
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    onPressed: _cargarTodosLosActivos,
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Reintentar'),
+                  ),
                 ],
               ),
             );
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             itemCount: activoVM.activos.length,
             itemBuilder: (context, index) {
               final activo = activoVM.activos[index];

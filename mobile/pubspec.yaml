@@ -58,6 +58,7 @@ dependencies:
   file_picker: ^8.1.0
   vibration: ^3.2.1
   audioplayers: ^5.2.0
+  flutter_native_splash: ^2.4.4
 
 dev_dependencies:
   flutter_test:
@@ -94,3 +95,14 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/images/logo_itbm.png"
+
+flutter_native_splash:
+  color: "#F3F4F6"
+  image: assets/images/logo_itbm_splash.png
+  android_12:
+    color: "#F3F4F6"
+    image: assets/images/logo_itbm_splash.png
+    icon_background_color: "#F3F4F6"
+  android: true
+  ios: true
+  web: false

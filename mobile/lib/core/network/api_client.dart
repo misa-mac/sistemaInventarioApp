@@ -5,6 +5,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 class ApiClient {
+  static const Duration defaultTimeout = Duration(seconds: 4);
+
   String get _baseUrl => ApiConstants.baseUrl;
 
   Map<String, String> _getHeaders() {
@@ -38,7 +40,7 @@ class ApiClient {
     final url = _buildUri(endpoint);
     debugPrint('🌐 GET: $url');
     final response = await http.get(url, headers: _getHeaders()).timeout(
-      const Duration(seconds: 10),
+      defaultTimeout,
       onTimeout: () => throw Exception('Tiempo de espera agotado al conectar con el servidor ($url).'),
     );
     
@@ -62,7 +64,7 @@ class ApiClient {
       headers: _getHeaders(),
       body: jsonEncode(body),
     ).timeout(
-      const Duration(seconds: 10),
+      defaultTimeout,
       onTimeout: () => throw Exception('Tiempo de espera agotado al conectar con el servidor ($url).'),
     );
 
@@ -90,7 +92,7 @@ class ApiClient {
       headers: _getHeaders(),
       body: jsonEncode(body),
     ).timeout(
-      const Duration(seconds: 10),
+      defaultTimeout,
       onTimeout: () => throw Exception('Tiempo de espera agotado al conectar con el servidor ($url).'),
     );
 
@@ -118,7 +120,7 @@ class ApiClient {
       headers: _getHeaders(),
       body: jsonEncode(body),
     ).timeout(
-      const Duration(seconds: 10),
+      defaultTimeout,
       onTimeout: () => throw Exception('Tiempo de espera agotado al conectar con el servidor ($url).'),
     );
 
