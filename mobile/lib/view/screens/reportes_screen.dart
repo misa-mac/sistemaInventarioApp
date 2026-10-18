@@ -9,6 +9,7 @@ import 'package:inventario_qr_app/models/auditoria_model.dart';
 import 'package:inventario_qr_app/repositories/auditoria_repository.dart';
 import 'package:inventario_qr_app/models/ambiente_model.dart';
 import 'package:inventario_qr_app/viewmodel/ambiente_viewmodel.dart';
+import 'package:inventario_qr_app/view/widgets/floating_bottom_nav_bar.dart';
 
 class ReportesScreen extends StatefulWidget {
   const ReportesScreen({super.key});
@@ -31,9 +32,11 @@ class _ReportesScreenState extends State<ReportesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = FloatingBottomNavBar.totalOccupiedHeight(context);
+
     return Scaffold(
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, bottomInset + 90),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

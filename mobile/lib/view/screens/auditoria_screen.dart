@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -25,6 +26,17 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
   String? _ultimoCodigoEscaneado;
   int _noEsperadosCount = 0;
 
+  // Control de tiempo de espera (cooldown) y prevención de lecturas duplicadas
+  static const int _cooldownDurationMs = 2500; // 2.5s tiempo de espera para leer otro QR
+  bool _enCooldown = false;
+  double _cooldownProgress = 0.0;
+  Timer? _cooldownTimer;
+  Timer? _animTimer;
+  DateTime? _ultimoEscaneoTime;
+  String? _mensajeEstado;
+  Color _mensajeEstadoColor = Colors.white;
+  final Set<String> _codigosAuditados = {}; // Registro local de QRs ya leídos en la sesión
+
   @override
   void initState() {
     super.initState();
@@ -35,6 +47,8 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
 
   @override
   void dispose() {
+    _cooldownTimer?.cancel();
+    _animTimer?.cancel();
     _cameraController.dispose();
     _audioPlayer.dispose();
     super.dispose();
@@ -89,25 +103,126 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
     } catch (_) {}
   }
 
+  /// Inicia el temporizador de enfriamiento (cooldown) y actualiza la animación en pantalla
+  void _iniciarCooldown({
+    int durationMs = _cooldownDurationMs,
+    String? mensaje,
+    Color? color,
+  }) {
+    _cooldownTimer?.cancel();
+    _animTimer?.cancel();
+
+    final startTime = DateTime.now();
+    if (mounted) {
+      setState(() {
+        _enCooldown = true;
+        _cooldownProgress = 1.0;
+        if (mensaje != null) {
+          _mensajeEstado = mensaje;
+          _mensajeEstadoColor = color ?? AppColors.brandBlue;
+        }
+      });
+    }
+
+    // Actualización progresiva suave para el indicador visual
+    _animTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      final elapsed = DateTime.now().difference(startTime).inMilliseconds;
+      final remaining = (durationMs - elapsed) / durationMs;
+      if (remaining <= 0) {
+        timer.cancel();
+      } else {
+        setState(() {
+          _cooldownProgress = remaining.clamp(0.0, 1.0);
+        });
+      }
+    });
+
+    _cooldownTimer = Timer(Duration(milliseconds: durationMs), () {
+      if (mounted) {
+        setState(() {
+          _enCooldown = false;
+          _isProcessing = false;
+          _cooldownProgress = 0.0;
+          _mensajeEstado = null;
+        });
+      }
+    });
+  }
+
   void _procesarEscaneoQr(String codigoQr) async {
-    if (_isProcessing || codigoQr.isEmpty) return;
+    final cleanCode = codigoQr.trim();
+    if (cleanCode.isEmpty) return;
+
+    // 1. Si está procesando actualmente la API o en período de espera (cooldown), ignorar
+    if (_isProcessing || _enCooldown) return;
+
+    final now = DateTime.now();
+
+    // 2. Si es EXACTAMENTE el mismo código que el último leído:
+    // Evitar re-recolectar el mismo código si se mantiene en foco la cámara
+    if (_ultimoCodigoEscaneado == cleanCode) {
+      if (_ultimoEscaneoTime != null &&
+          now.difference(_ultimoEscaneoTime!).inSeconds < 5) {
+        return; // Ignorar silenciosamente mientras permanezca apuntando al mismo QR
+      }
+    }
+
+    // 3. Si el activo ya fue auditado previamente en esta sesión de auditoría:
+    final auditoriaVM = context.read<AuditoriaViewModel>();
+    if (_codigosAuditados.contains(cleanCode)) {
+      _ultimoCodigoEscaneado = cleanCode;
+      _ultimoEscaneoTime = now;
+      await Vibration.vibrate(duration: 100);
+      if (mounted) {
+        _iniciarCooldown(
+          durationMs: 2000,
+          mensaje: '⚠️ Este equipo ya fue registrado en esta auditoría',
+          color: AppColors.statusAmberText,
+        );
+      }
+      return;
+    }
+
+    // 4. Iniciar procesamiento del nuevo código QR
     _isProcessing = true;
-    _ultimoCodigoEscaneado = codigoQr;
+    _ultimoCodigoEscaneado = cleanCode;
+    _ultimoEscaneoTime = now;
 
     try {
       final activoVM = context.read<ActivoViewModel>();
-      final auditoriaVM = context.read<AuditoriaViewModel>();
 
-      await activoVM.procesarEscaneoQr(codigoQr);
+      await activoVM.procesarEscaneoQr(cleanCode);
 
       if (activoVM.activoActual != null) {
+        final activoId = activoVM.activoActual!.id;
+
+        // Doble verificación: comprobar si el ID del activo ya fue auditado
+        if (auditoriaVM.isActivoAuditado(activoId)) {
+          _codigosAuditados.add(cleanCode);
+          await Vibration.vibrate(duration: 100);
+          if (mounted) {
+            _iniciarCooldown(
+              durationMs: 2000,
+              mensaje: '⚠️ El activo "${activoVM.activoActual!.nombre}" ya fue auditado',
+              color: AppColors.statusAmberText,
+            );
+          }
+          return;
+        }
+
         final success = await auditoriaVM.registrarEscaneo(
-          activoVM.activoActual!.id,
+          activoId,
           'presente',
           null,
         );
 
         if (success) {
+          _codigosAuditados.add(cleanCode);
+
           // Confirmación visual (flash verde) + vibración + sonido
           if (mounted) {
             setState(() => _scanFlash = true);
@@ -120,21 +235,31 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
               setState(() => _scanFlash = false);
             }
           });
+
+          // Iniciar tiempo de espera (2.5s) para enfocar el siguiente QR sin lecturas duplicadas
+          if (mounted) {
+            _iniciarCooldown(
+              durationMs: _cooldownDurationMs,
+              mensaje: '✓ Registrado: $cleanCode • Espera 2.5s para siguiente QR',
+              color: AppColors.statusGreen,
+            );
+          }
+        } else {
+          if (mounted) {
+            _iniciarCooldown(durationMs: 1200);
+          }
         }
       } else {
         await Vibration.vibrate(duration: 150);
         if (mounted) {
-          _mostrarModalNoEsperado(context, codigoQr, auditoriaVM);
+          _mostrarModalNoEsperado(context, cleanCode, auditoriaVM);
         }
       }
     } catch (e) {
       debugPrint('Error en auditoría QR: $e');
-    } finally {
-      Future.delayed(const Duration(milliseconds: 600), () {
-        if (mounted) {
-          setState(() => _isProcessing = false);
-        }
-      });
+      if (mounted) {
+        _iniciarCooldown(durationMs: 1200);
+      }
     }
   }
 
@@ -191,7 +316,14 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => Navigator.pop(ctx),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _iniciarCooldown(
+                        durationMs: 2000,
+                        mensaje: 'Código no esperado ignorado',
+                        color: AppColors.statusAmberText,
+                      );
+                    },
                     child: const Text('Ignorar'),
                   ),
                 ),
@@ -204,10 +336,16 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
                         'no_esperado',
                         'Equipo no esperado en ambiente',
                       );
+                      _codigosAuditados.add(codigoQr);
                       setState(() {
                         _noEsperadosCount++;
                       });
                       if (ctx.mounted) Navigator.pop(ctx);
+                      _iniciarCooldown(
+                        durationMs: _cooldownDurationMs,
+                        mensaje: '✓ Registrado como no esperado: $codigoQr',
+                        color: AppColors.statusAmberText,
+                      );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.statusAmber,
@@ -589,8 +727,9 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
                         },
                       ),
 
-                      // Marco guía de enfoque
-                      Container(
+                      // Marco guía de enfoque reactivo al estado
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
                         width: 230,
                         height: 230,
                         decoration: BoxDecoration(
@@ -598,8 +737,12 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
                           border: Border.all(
                             color: _scanFlash
                                 ? AppColors.statusGreen
-                                : Colors.white.withValues(alpha: 0.85),
-                            width: _scanFlash ? 3.5 : 2.5,
+                                : (_enCooldown
+                                    ? _mensajeEstadoColor.withValues(alpha: 0.85)
+                                    : Colors.white.withValues(alpha: 0.85)),
+                            width: _scanFlash
+                                ? 3.5
+                                : (_enCooldown ? 3.0 : 2.5),
                           ),
                         ),
                       ),
@@ -626,26 +769,72 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
                           ),
                         ),
 
-                      // Indicador de último código escaneado
-                      if (_ultimoCodigoEscaneado != null)
-                        Positioned(
-                          bottom: 16,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      // Indicador dinámico de estado / cooldown / último código escaneado
+                      Positioned(
+                        bottom: 16,
+                        left: 16,
+                        right: 16,
+                        child: Center(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 250),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                             decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.7),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              'Último: $_ultimoCodigoEscaneado',
-                              style: const TextStyle(
-                                fontFamily: 'monospace',
-                                color: Colors.white,
-                                fontSize: 12,
+                              color: Colors.black.withValues(alpha: 0.78),
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: _enCooldown
+                                    ? _mensajeEstadoColor.withValues(alpha: 0.7)
+                                    : AppColors.statusGreen.withValues(alpha: 0.5),
+                                width: 1.5,
                               ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_enCooldown) ...[
+                                  SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      value: _cooldownProgress > 0 ? _cooldownProgress : null,
+                                      strokeWidth: 2,
+                                      color: _mensajeEstadoColor,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ] else ...[
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.statusGreen,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+                                Flexible(
+                                  child: Text(
+                                    _enCooldown
+                                        ? (_mensajeEstado ?? 'Pausa entre lecturas...')
+                                        : (_ultimoCodigoEscaneado != null
+                                            ? 'Listo • Último: $_ultimoCodigoEscaneado'
+                                            : 'Apunta la cámara al código QR'),
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      color: _enCooldown ? _mensajeEstadoColor : Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
+                      ),
                     ],
                   ),
                 ),

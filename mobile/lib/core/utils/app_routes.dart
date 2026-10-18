@@ -10,6 +10,7 @@ import 'package:inventario_qr_app/view/screens/select_ambiente_auditoria_screen.
 import 'package:inventario_qr_app/view/screens/resultados_auditoria_screen.dart';
 import 'package:inventario_qr_app/view/screens/equipos_management_screen.dart';
 import 'package:inventario_qr_app/view/screens/formulario_equipo_screen.dart';
+import 'package:inventario_qr_app/view/screens/mis_solicitudes_screen.dart';
 import 'package:inventario_qr_app/models/activo_model.dart';
 
 class AppRoutes {
@@ -24,6 +25,7 @@ class AppRoutes {
   static const String resultadosAuditoria = '/resultados-auditoria';
   static const String equiposManagement = '/equipos-management';
   static const String formularioEquipo = '/formulario-equipo';
+  static const String misSolicitudes = '/mis-solicitudes';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -51,6 +53,8 @@ class AppRoutes {
         return MaterialPageRoute(
           builder: (_) => FormularioEquipoScreen(activo: activo),
         );
+      case misSolicitudes:
+        return MaterialPageRoute(builder: (_) => const MisSolicitudesScreen());
       default:
         return MaterialPageRoute(
           builder: (_) => const Scaffold(

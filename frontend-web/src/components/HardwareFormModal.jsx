@@ -98,34 +98,14 @@ const HardwareFormModal = ({ isOpen, onClose, onSuccess, editData }) => {
     }
   };
 
-  // Calcular correlativo y código cuando se eligen tipo y ambiente
+  // El código oficial se asigna exclusivamente en la base de datos por el trigger fn_activos_asignar_codigo
   useEffect(() => {
-    if (!editData && formData.tipo_activo_id && formData.ambiente_id) {
-      const ambRegistro = formData.ambiente_registro_id || formData.ambiente_id;
-      api.get(`/inventory/next-sequence?tipo_activo_id=${formData.tipo_activo_id}&ambiente_id=${ambRegistro}`)
-        .then(res => {
-          const seq = res.data.next || 1;
-          setNextSequence(seq);
-
-          const tipo = tiposActivos.find(t => t.id === formData.tipo_activo_id);
-          const ambiente = ambientes.find(a => a.id === ambRegistro);
-          
-          if (tipo && ambiente) {
-            const AA = tipo.codigo.toString().padStart(2, '0');
-            const CC = ambiente.codigo.toString().padStart(2, '0');
-            const GG = seq.toString().padStart(2, '0');
-            const dateObj = new Date(formData.fecha_ingreso || new Date());
-            const YY = (dateObj.getFullYear().toString()).slice(-2);
-            
-            // Estructura oficial unificada: 1YYAACC-GG
-            setPreviewCodigo(`1${YY}${AA}${CC}-${GG}`);
-          }
-        })
-        .catch(err => {
-          console.error("Error al obtener secuencia:", err);
-        });
+    if (editData) {
+      setPreviewCodigo(editData.codigo_activo);
+    } else {
+      setPreviewCodigo('Asignado por base de datos (1YYAACC-GG)');
     }
-  }, [formData.tipo_activo_id, formData.ambiente_id, formData.ambiente_registro_id, formData.fecha_ingreso, tiposActivos, ambientes, editData]);
+  }, [editData]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

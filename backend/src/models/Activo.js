@@ -12,11 +12,11 @@ const Activo = sequelize.define('Activo', {
   codigo_activo: {
     type: DataTypes.STRING(20),
     unique: true,
-    allowNull: false,
+    allowNull: true, // Asignado por el trigger de base de datos fn_activos_asignar_codigo
   },
   numero_correlativo: {
     type: DataTypes.INTEGER,
-    allowNull: false,
+    allowNull: true, // Asignado por el trigger de base de datos fn_activos_asignar_codigo
   },
   tipo_activo_id: {
     type: DataTypes.UUID,

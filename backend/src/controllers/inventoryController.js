@@ -259,34 +259,9 @@ exports.create = async (req, res) => {
 
     value.ambiente_registro_id = ambienteRegistroId;
     
-    const maxCorrelativo = await Activo.max('numero_correlativo', {
-      where: {
-        tipo_activo_id: value.tipo_activo_id,
-        ambiente_registro_id: ambienteRegistroId
-      },
-      transaction: t
-    }) || 0;
-
-    const numero_correlativo = maxCorrelativo + 1;
-    if (numero_correlativo > 99) {
-      await t.rollback();
-      return res.status(400).json({ message: 'Se agotó el correlativo (máx. 99) para este tipo en este ambiente' });
-    }
-    
-    const fechaIngreso = value.fecha_ingreso ? new Date(value.fecha_ingreso) : new Date();
-    const YY = (fechaIngreso.getFullYear().toString()).slice(-2);
-    const AA = tipo.codigo.toString().padStart(2, '0');
-    const CC = ambienteRegistro.codigo.toString().padStart(2, '0');
-    const GG = numero_correlativo.toString().padStart(2, '0');
-    
-    const codigo_activo = `1${YY}${AA}${CC}-${GG}`;
-    
-    value.numero_correlativo = numero_correlativo;
-    value.codigo_activo = codigo_activo;
-    
-    if (!value.nombre || value.nombre.trim() === '') {
-      value.nombre = `${tipo.nombre} ${codigo_activo}`;
-    }
+    // Dejar que la base de datos (trigger fn_activos_asignar_codigo) sea la ÚNICA fuente de verdad para el código y correlativo
+    delete value.codigo_activo;
+    delete value.numero_correlativo;
 
     if (req.file) {
       value.imagen_url = `/uploads/activos/${req.file.filename}`;
@@ -297,6 +272,15 @@ exports.create = async (req, res) => {
     const activo = await Activo.create(value, { transaction: t });
     await t.commit();
     
+    // Recargar para obtener el codigo_activo y numero_correlativo asignados por el trigger
+    await activo.reload({
+      include: [
+        { model: Ambiente, as: 'ambiente', attributes: ['id', 'nombre', 'codigo', 'ubicacion'] },
+        { model: Ambiente, as: 'ambiente_registro', attributes: ['id', 'nombre', 'codigo', 'ubicacion'] },
+        { model: TipoActivo, as: 'tipo', attributes: ['id', 'nombre', 'codigo'] }
+      ]
+    });
+
     const plain = activo.toJSON();
     plain.imagen = plain.imagen_url;
     res.status(201).json(plain);
@@ -323,10 +307,12 @@ exports.update = async (req, res) => {
 
     if (!activo) return res.status(404).json({ message: 'Activo no encontrado' });
     
+    // Campos inmutables en edición (cambiar de ambiente es traslado, no edición)
     delete value.codigo_activo;
     delete value.numero_correlativo;
     delete value.tipo_activo_id;
     delete value.ambiente_registro_id;
+    delete value.ambiente_id;
 
     if (req.file) {
       value.imagen_url = `/uploads/activos/${req.file.filename}`;

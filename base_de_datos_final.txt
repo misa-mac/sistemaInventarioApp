@@ -1,0 +1,591 @@
+-- =====================================================================
+-- SISTEMA DE CONTROL DE INVENTARIO ITBM v2 - BASE DE DATOS FINAL
+-- Motor de Base de Datos : PostgreSQL 13+
+-- Base de Datos          : inventario_db
+-- Codificación           : UTF-8
+-- Esquema                : public
+-- Arquitectura           : Gobernanza centralizada (Web es autoridad,
+--                          Móvil propone solicitudes, Web aprueba/rechaza)
+-- Seguridad              : Principio de menor privilegio (rol app_inventario),
+--                          Inmutabilidad de auditoría (OWASP A09),
+--                          Código único de activo XYZAACC-GG autogenerado.
+-- =====================================================================
+
+-- INSTRUCCIONES DE EJECUCIÓN:
+-- 1. Crear la base de datos si aún no existe:
+--    CREATE DATABASE inventario_db WITH ENCODING 'UTF8';
+-- 2. Conectarse a la base de datos:
+--    \c inventario_db;
+-- 3. Ejecutar este script completo de principio a fin.
+
+BEGIN;
+
+-- =====================================================================
+-- 0. EXTENSIONES Y LIMPIEZA PREVIA (Opcional para instalación limpia)
+-- =====================================================================
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Eliminar tablas existentes si se requiere regeneración limpia
+DROP TABLE IF EXISTS audit_logs CASCADE;
+DROP TABLE IF EXISTS detalle_auditoria CASCADE;
+DROP TABLE IF EXISTS auditorias CASCADE;
+DROP TABLE IF EXISTS notificaciones CASCADE;
+DROP TABLE IF EXISTS movimientos CASCADE;
+DROP TABLE IF EXISTS solicitudes_cambio CASCADE;
+DROP TABLE IF EXISTS activos CASCADE;
+DROP TABLE IF EXISTS ambientes CASCADE;
+DROP TABLE IF EXISTS tipo_activos CASCADE;
+DROP TABLE IF EXISTS usuarios CASCADE;
+
+-- Eliminar tipos ENUM si existen
+DROP TYPE IF EXISTS estado_solicitud CASCADE;
+DROP TYPE IF EXISTS tipo_solicitud CASCADE;
+DROP TYPE IF EXISTS estado_sesion_auditoria CASCADE;
+DROP TYPE IF EXISTS estado_auditoria CASCADE;
+DROP TYPE IF EXISTS tipo_mantenimiento CASCADE;
+DROP TYPE IF EXISTS tipo_notificacion CASCADE;
+DROP TYPE IF EXISTS tipo_evento CASCADE;
+DROP TYPE IF EXISTS estado_activo CASCADE;
+DROP TYPE IF EXISTS rol_usuario CASCADE;
+
+-- =====================================================================
+-- 1. TIPOS DE DATOS ENUMERADOS (ENUMs)
+-- =====================================================================
+CREATE TYPE rol_usuario AS ENUM (
+  'admin',
+  'tecnico',
+  'auditor'
+);
+
+CREATE TYPE estado_activo AS ENUM (
+  'Activo',
+  'Inactivo',
+  'Dañado'
+);
+
+CREATE TYPE tipo_evento AS ENUM (
+  'traslado',
+  'mantenimiento',
+  'baja'
+);
+
+CREATE TYPE tipo_notificacion AS ENUM (
+  'info',
+  'warning',
+  'error',
+  'success'
+);
+
+CREATE TYPE tipo_mantenimiento AS ENUM (
+  'preventivo',
+  'correctivo'
+);
+
+CREATE TYPE estado_auditoria AS ENUM (
+  'presente',
+  'faltante',
+  'no_esperado'
+);
+
+CREATE TYPE estado_sesion_auditoria AS ENUM (
+  'en_progreso',
+  'completada',
+  'cancelada'
+);
+
+CREATE TYPE tipo_solicitud AS ENUM (
+  'alta',
+  'edicion',
+  'baja'
+);
+
+CREATE TYPE estado_solicitud AS ENUM (
+  'pendiente',
+  'aprobada',
+  'rechazada'
+);
+
+-- =====================================================================
+-- 2. FUNCIONES AUXILIARES Y PROCEDIMIENTOS ALMACENADOS
+-- =====================================================================
+
+-- 2.1 Actualización automática de updated_at
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$;
+
+-- 2.2 Bloqueo de modificaciones (Inmutabilidad para OWASP A09)
+CREATE OR REPLACE FUNCTION fn_bloquear_modificacion()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'La tabla % es de solo inserción (operación % bloqueada por seguridad)',
+    TG_TABLE_NAME, TG_OP;
+END;
+$$;
+
+-- 2.3 Generador automático del código normalizado XYZAACC-GG
+-- Regla institucional:
+-- X  = 1 (Constante nacional de inventario de activos)
+-- YZ = Últimos 2 dígitos del año (ej. 26 para 2026)
+-- AA = Código de 2 dígitos del tipo de activo (Catálogo tipo_activos)
+-- CC = Código de 2 dígitos del ambiente de registro (Catálogo ambientes)
+-- GG = Correlativo secuencial de 2 dígitos (01 a 99)
+CREATE OR REPLACE FUNCTION fn_activos_asignar_codigo()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+DECLARE
+  v_aa INTEGER;
+  v_cc INTEGER;
+BEGIN
+  -- Si no se especifica ambiente de registro original, se asigna el ambiente actual
+  IF NEW.ambiente_registro_id IS NULL THEN
+    NEW.ambiente_registro_id := NEW.ambiente_id;
+  END IF;
+
+  -- Si el código de activo no se envía, la base de datos lo calcula y garantiza unicidad
+  IF NEW.codigo_activo IS NULL OR btrim(NEW.codigo_activo) = '' THEN
+    SELECT codigo INTO v_aa FROM tipo_activos WHERE id = NEW.tipo_activo_id;
+    SELECT codigo INTO v_cc FROM ambientes    WHERE id = NEW.ambiente_registro_id;
+
+    IF v_aa IS NULL OR v_cc IS NULL THEN
+      RAISE EXCEPTION 'Tipo de activo o ambiente de registro inexistente al asignar código';
+    END IF;
+
+    -- Bloqueo transaccional por tipo + ambiente para prevenir colisiones en altas concurrentes
+    PERFORM pg_advisory_xact_lock(
+      hashtextextended(NEW.tipo_activo_id::text || NEW.ambiente_registro_id::text, 0)
+    );
+
+    IF NEW.numero_correlativo IS NULL THEN
+      SELECT COALESCE(MAX(numero_correlativo), 0) + 1
+        INTO NEW.numero_correlativo
+        FROM activos
+       WHERE tipo_activo_id = NEW.tipo_activo_id
+         AND ambiente_registro_id = NEW.ambiente_registro_id;
+    END IF;
+
+    IF NEW.numero_correlativo > 99 THEN
+      RAISE EXCEPTION 'Capacidad máxima de correlativos (máx. 99) alcanzada para este tipo y ambiente';
+    END IF;
+
+    NEW.codigo_activo := '1'
+      || to_char(COALESCE(NEW.fecha_ingreso, CURRENT_DATE), 'YY')
+      || lpad(v_aa::text, 2, '0')
+      || lpad(v_cc::text, 2, '0')
+      || '-' || lpad(NEW.numero_correlativo::text, 2, '0');
+  END IF;
+
+  -- Nombre descriptivo por defecto si viene vacío
+  IF NEW.nombre IS NULL OR btrim(NEW.nombre) = '' THEN
+    NEW.nombre := COALESCE((SELECT nombre FROM tipo_activos WHERE id = NEW.tipo_activo_id), 'Activo')
+                  || ' ' || NEW.codigo_activo;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+-- 2.4 Inmutabilidad de la identidad física del activo (código QR, tipo y ambiente origen)
+CREATE OR REPLACE FUNCTION fn_activos_identidad_inmutable()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.codigo_activo        IS DISTINCT FROM OLD.codigo_activo
+  OR NEW.numero_correlativo   IS DISTINCT FROM OLD.numero_correlativo
+  OR NEW.tipo_activo_id       IS DISTINCT FROM OLD.tipo_activo_id
+  OR NEW.ambiente_registro_id IS DISTINCT FROM OLD.ambiente_registro_id THEN
+    RAISE EXCEPTION 'La identidad física del activo (código, tipo y ambiente de registro) es inmutable';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- 2.5 Reglas de gobernanza para solicitudes de cambio (inmutabilidad una vez resuelta)
+CREATE OR REPLACE FUNCTION fn_solicitud_inmutable()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF OLD.estado <> 'pendiente' THEN
+    RAISE EXCEPTION 'La solicitud ya fue resuelta (%) y no puede modificarse', OLD.estado;
+  END IF;
+
+  IF NEW.tipo           IS DISTINCT FROM OLD.tipo
+  OR NEW.activo_id      IS DISTINCT FROM OLD.activo_id
+  OR NEW.datos          IS DISTINCT FROM OLD.datos
+  OR NEW.motivo         IS DISTINCT FROM OLD.motivo
+  OR NEW.solicitante_id IS DISTINCT FROM OLD.solicitante_id THEN
+    RAISE EXCEPTION 'El contenido de una solicitud no puede alterarse; genere una nueva solicitud';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+-- 2.6 Trazabilidad obligatoria: solicitudes de cambio no se eliminan
+CREATE OR REPLACE FUNCTION fn_solicitud_no_borrar()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'Las solicitudes de cambio no se pueden eliminar por reglas de auditoría y trazabilidad';
+END;
+$$;
+
+-- =====================================================================
+-- 3. DEFINICIÓN DE TABLAS (DDL)
+-- =====================================================================
+
+-- 3.1 USUARIOS
+CREATE TABLE usuarios (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre_completo VARCHAR(150) NOT NULL,
+  email           VARCHAR(150) NOT NULL UNIQUE CHECK (email = lower(email)),
+  password_hash   VARCHAR(255) NOT NULL,
+  rol             rol_usuario  NOT NULL DEFAULT 'tecnico',
+  activo          BOOLEAN      NOT NULL DEFAULT true,
+  created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+-- 3.2 TIPO_ACTIVOS (Catálogo Código AA)
+CREATE TABLE tipo_activos (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre      VARCHAR(100) NOT NULL UNIQUE,
+  codigo      INTEGER      NOT NULL UNIQUE CHECK (codigo BETWEEN 0 AND 99),
+  descripcion TEXT,
+  activo      BOOLEAN      NOT NULL DEFAULT true,
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+-- 3.3 AMBIENTES (Catálogo Código CC + Geocerca GPS)
+CREATE TABLE ambientes (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre         VARCHAR(100)  NOT NULL UNIQUE,
+  codigo         INTEGER       NOT NULL UNIQUE CHECK (codigo BETWEEN 0 AND 99),
+  ubicacion      VARCHAR(255),
+  descripcion    TEXT,
+  latitude       NUMERIC(10,8) CHECK (latitude  BETWEEN -90  AND 90),
+  longitude      NUMERIC(11,8) CHECK (longitude BETWEEN -180 AND 180),
+  radio_geofence NUMERIC(5,2)  NOT NULL DEFAULT 50 CHECK (radio_geofence > 0),
+  tiene_internet BOOLEAN       NOT NULL DEFAULT true,
+  activo         BOOLEAN       NOT NULL DEFAULT true,
+  created_at     TIMESTAMPTZ   NOT NULL DEFAULT now(),
+  updated_at     TIMESTAMPTZ   NOT NULL DEFAULT now(),
+  CHECK ((latitude IS NULL) = (longitude IS NULL))
+);
+
+-- 3.4 ACTIVOS (Equipos con código normalizado XYZAACC-GG)
+CREATE TABLE activos (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  codigo_activo        VARCHAR(20) NOT NULL UNIQUE CHECK (codigo_activo ~ '^[0-9]{7}-[0-9]{2}$'),
+  numero_correlativo   INTEGER     NOT NULL CHECK (numero_correlativo BETWEEN 1 AND 99),
+  tipo_activo_id       UUID        NOT NULL REFERENCES tipo_activos(id),
+  ambiente_id          UUID        NOT NULL REFERENCES ambientes(id),
+  ambiente_registro_id UUID        NOT NULL REFERENCES ambientes(id),
+  nombre               VARCHAR(150) NOT NULL,
+  marca                VARCHAR(100),
+  modelo               VARCHAR(100),
+  numero_serie         VARCHAR(100),
+  origen               VARCHAR(150),
+  especificacion_origen VARCHAR(255),
+  descripcion          TEXT,
+  responsable          VARCHAR(150),
+  fecha_ingreso        DATE,
+  valor                NUMERIC(10,2) CHECK (valor >= 0),
+  imagen_url           TEXT,
+  estado               estado_activo NOT NULL DEFAULT 'Activo',
+  observaciones        TEXT,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (tipo_activo_id, ambiente_registro_id, numero_correlativo)
+);
+
+-- 3.5 SOLICITUDES_CAMBIO (Mecanismo central de gobernanza de inventario)
+CREATE TABLE solicitudes_cambio (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tipo                 tipo_solicitud   NOT NULL,
+  estado               estado_solicitud NOT NULL DEFAULT 'pendiente',
+  solicitante_id       UUID             NOT NULL REFERENCES usuarios(id),
+  activo_id            UUID             REFERENCES activos(id),
+  datos                JSONB            NOT NULL DEFAULT '{}'::jsonb,
+  motivo               TEXT,
+  comentario_revision  TEXT,
+  revisor_id           UUID             REFERENCES usuarios(id),
+  revisado_at          TIMESTAMPTZ,
+  activo_resultante_id UUID             REFERENCES activos(id),
+  created_at           TIMESTAMPTZ      NOT NULL DEFAULT now(),
+  updated_at           TIMESTAMPTZ      NOT NULL DEFAULT now(),
+
+  -- Reglas de integridad de gobernanza
+  CHECK (tipo = 'alta' OR activo_id IS NOT NULL),
+  CHECK (tipo <> 'baja' OR (motivo IS NOT NULL AND length(btrim(motivo)) > 0)),
+  CHECK (estado <> 'rechazada' OR (comentario_revision IS NOT NULL AND length(btrim(comentario_revision)) > 0)),
+  CHECK (estado = 'pendiente' OR (revisor_id IS NOT NULL AND revisado_at IS NOT NULL))
+);
+
+-- 3.6 MOVIMIENTOS (Historial de traslados, mantenimientos y bajas)
+CREATE TABLE movimientos (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tipo_evento         tipo_evento NOT NULL,
+  activo_id           UUID NOT NULL REFERENCES activos(id),
+  usuario_id          UUID NOT NULL REFERENCES usuarios(id),
+  ambiente_origen_id   UUID REFERENCES ambientes(id),
+  ambiente_destino_id  UUID REFERENCES ambientes(id),
+  estado_anterior     estado_activo,
+  estado_nuevo        estado_activo,
+  tipo_mantenimiento  tipo_mantenimiento,
+  piezas_reemplazadas TEXT,
+  costo_mantenimiento NUMERIC(10,2) CHECK (costo_mantenimiento >= 0),
+  observaciones       TEXT,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  -- Restricciones de integridad por tipo de evento
+  CHECK (tipo_evento = 'mantenimiento'
+         OR (tipo_mantenimiento IS NULL AND piezas_reemplazadas IS NULL AND costo_mantenimiento IS NULL)),
+  CHECK (tipo_evento <> 'mantenimiento' OR length(btrim(COALESCE(observaciones, ''))) > 0),
+  CHECK (tipo_evento <> 'traslado'
+         OR (ambiente_origen_id IS NOT NULL
+             AND ambiente_destino_id IS NOT NULL
+             AND ambiente_origen_id <> ambiente_destino_id))
+);
+
+-- 3.7 NOTIFICACIONES (Alertas del sistema y avisos de flujo)
+CREATE TABLE notificaciones (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  usuario_id UUID REFERENCES usuarios(id), -- NULL = Notificación global de administración
+  titulo     VARCHAR(200) NOT NULL,
+  mensaje    TEXT NOT NULL,
+  tipo       tipo_notificacion NOT NULL DEFAULT 'info',
+  leida      BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 3.8 AUDITORIAS (Sesiones de control físico iniciadas desde app móvil)
+CREATE TABLE auditorias (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ambiente_id        UUID NOT NULL REFERENCES ambientes(id),
+  auditor_id         UUID NOT NULL REFERENCES usuarios(id),
+  fecha_inicio       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  fecha_fin          TIMESTAMPTZ,
+  total_esperados    INTEGER NOT NULL DEFAULT 0 CHECK (total_esperados   >= 0),
+  total_encontrados  INTEGER NOT NULL DEFAULT 0 CHECK (total_encontrados >= 0),
+  total_faltantes    INTEGER NOT NULL DEFAULT 0 CHECK (total_faltantes   >= 0),
+  total_no_esperados INTEGER NOT NULL DEFAULT 0 CHECK (total_no_esperados >= 0),
+  estado             estado_sesion_auditoria NOT NULL DEFAULT 'en_progreso',
+  observaciones      TEXT,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (fecha_fin IS NULL OR fecha_fin >= fecha_inicio)
+);
+
+-- 3.9 DETALLE_AUDITORIA (Lecturas físicas de etiquetas QR)
+CREATE TABLE detalle_auditoria (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  auditoria_id        UUID NOT NULL REFERENCES auditorias(id) ON DELETE CASCADE,
+  activo_id           UUID REFERENCES activos(id),
+  codigo_qr_escaneado VARCHAR(50),
+  estado              estado_auditoria NOT NULL,
+  observacion         TEXT,
+  fecha_escaneo       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  sincronizado        BOOLEAN NOT NULL DEFAULT true,
+  CHECK (estado = 'no_esperado' OR activo_id IS NOT NULL),
+  CHECK (estado = 'faltante'    OR codigo_qr_escaneado IS NOT NULL)
+);
+
+-- 3.10 AUDIT_LOGS (Bitácora inmutable OWASP A09 de trazabilidad y seguridad)
+CREATE TABLE audit_logs (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  usuario_id UUID REFERENCES usuarios(id),
+  accion     VARCHAR(100) NOT NULL,
+  recurso    VARCHAR(50)  NOT NULL,
+  recurso_id VARCHAR(100),
+  resultado  VARCHAR(20)  NOT NULL CHECK (resultado IN ('exitoso', 'fallido')),
+  detalles   TEXT,
+  ip_address VARCHAR(45),
+  user_agent TEXT,
+  fecha_hora TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- =====================================================================
+-- 4. DISPARADORES (TRIGGERS)
+-- =====================================================================
+
+-- 4.1 Triggers de activos
+CREATE TRIGGER trg_activos_codigo
+  BEFORE INSERT ON activos
+  FOR EACH ROW EXECUTE FUNCTION fn_activos_asignar_codigo();
+
+CREATE TRIGGER trg_activos_identidad
+  BEFORE UPDATE ON activos
+  FOR EACH ROW EXECUTE FUNCTION fn_activos_identidad_inmutable();
+
+-- 4.2 Triggers de auditoría y seguridad inmutable
+CREATE TRIGGER trg_audit_logs_inmutable
+  BEFORE UPDATE OR DELETE ON audit_logs
+  FOR EACH ROW EXECUTE FUNCTION fn_bloquear_modificacion();
+
+CREATE TRIGGER trg_audit_logs_no_truncate
+  BEFORE TRUNCATE ON audit_logs
+  FOR EACH STATEMENT EXECUTE FUNCTION fn_bloquear_modificacion();
+
+-- 4.3 Triggers de gobernanza en solicitudes de cambio
+CREATE TRIGGER trg_solicitud_inmutable
+  BEFORE UPDATE ON solicitudes_cambio
+  FOR EACH ROW EXECUTE FUNCTION fn_solicitud_inmutable();
+
+CREATE TRIGGER trg_solicitud_no_borrar
+  BEFORE DELETE ON solicitudes_cambio
+  FOR EACH ROW EXECUTE FUNCTION fn_solicitud_no_borrar();
+
+-- 4.4 Triggers de actualización temporal (updated_at)
+CREATE TRIGGER trg_usuarios_updated
+  BEFORE UPDATE ON usuarios
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_tipo_activos_updated
+  BEFORE UPDATE ON tipo_activos
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_ambientes_updated
+  BEFORE UPDATE ON ambientes
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_activos_updated
+  BEFORE UPDATE ON activos
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_solicitudes_cambio_updated
+  BEFORE UPDATE ON solicitudes_cambio
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- =====================================================================
+-- 5. ÍNDICES DE RENDIMIENTO Y BÚSQUEDA
+-- =====================================================================
+CREATE INDEX idx_activos_ambiente       ON activos(ambiente_id);
+CREATE INDEX idx_activos_tipo           ON activos(tipo_activo_id);
+CREATE INDEX idx_activos_serie          ON activos(numero_serie) WHERE numero_serie IS NOT NULL;
+CREATE INDEX idx_activos_estado         ON activos(estado);
+CREATE INDEX idx_movimientos_activo     ON movimientos(activo_id, created_at DESC);
+CREATE INDEX idx_movimientos_usuario    ON movimientos(usuario_id);
+CREATE INDEX idx_auditorias_ambiente    ON auditorias(ambiente_id);
+CREATE INDEX idx_auditorias_auditor     ON auditorias(auditor_id);
+CREATE INDEX idx_auditorias_estado      ON auditorias(estado);
+CREATE INDEX idx_detalle_auditoria      ON detalle_auditoria(auditoria_id);
+CREATE INDEX idx_detalle_activo         ON detalle_auditoria(activo_id);
+CREATE INDEX idx_notificaciones_usuario ON notificaciones(usuario_id, leida);
+CREATE INDEX idx_audit_logs_fecha       ON audit_logs(fecha_hora);
+CREATE INDEX idx_audit_logs_usuario     ON audit_logs(usuario_id);
+CREATE INDEX idx_solicitudes_estado     ON solicitudes_cambio(estado, created_at DESC);
+CREATE INDEX idx_solicitudes_solicitante ON solicitudes_cambio(solicitante_id);
+CREATE INDEX idx_solicitudes_activo     ON solicitudes_cambio(activo_id);
+CREATE INDEX idx_solicitudes_tipo       ON solicitudes_cambio(tipo);
+
+-- =====================================================================
+-- 6. SEGURIDAD Y PERMISOS DE APLICACIÓN (ROL app_inventario)
+-- =====================================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_inventario') THEN
+    CREATE ROLE app_inventario WITH LOGIN PASSWORD 'app_inventario_secret_2026';
+  ELSE
+    ALTER ROLE app_inventario WITH LOGIN PASSWORD 'app_inventario_secret_2026';
+  END IF;
+END $$;
+
+GRANT CONNECT ON DATABASE inventario_db TO app_inventario;
+GRANT USAGE ON SCHEMA public TO app_inventario;
+
+-- Privilegios CRUD completos para tablas transaccionales de negocio
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+  usuarios,
+  tipo_activos,
+  ambientes,
+  activos,
+  movimientos,
+  notificaciones,
+  auditorias,
+  detalle_auditoria,
+  solicitudes_cambio
+TO app_inventario;
+
+-- Privilegios para tabla de auditoría (estrictamente solo lectura e inserción)
+REVOKE ALL ON TABLE audit_logs FROM app_inventario;
+GRANT SELECT, INSERT ON TABLE audit_logs TO app_inventario;
+
+-- Acceso a secuencias del esquema público
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_inventario;
+
+-- =====================================================================
+-- 7. DATOS SEMILLA INICIALES (CATÁLOGOS, USUARIOS Y CONFIGURACIONES)
+-- =====================================================================
+
+-- 7.1 Catálogo de Ambientes (Código CC + Geocercas reales del instituto)
+INSERT INTO ambientes (codigo, nombre, ubicacion, descripcion, latitude, longitude, radio_geofence, tiene_internet, activo)
+VALUES
+  (20, 'Laboratorio 1',   'Bloque A - Planta Alta', 'Lab de computadoras',        -16.57773800, -68.19655600, 18.00, true, true),
+  (21, 'Laboratorio 2',   'Bloque A - Planta Alta', 'Lab de computadoras',        -16.57766000, -68.19660200, 17.00, true, true),
+  (22, 'Laboratorio 3',   'Bloque B - Planta Baja', 'Lab de computadoras',        -16.57789200, -68.19676800, 22.00, true, true),
+  (23, 'Taller 1',        'Bloque C - Técnico',     'Espacio de trabajo técnico', -16.57784000, -68.19659000, 18.00, true, true),
+  (24, 'Taller 2',        'Bloque C - Técnico',     'Espacio de trabajo técnico', -16.57785000, -68.19658000, 18.00, true, true),
+  (25, 'Oficina Central', 'Edificio Administrativo', 'Oficina Administrativa IT',  -16.57778500, -68.19652000, 15.00, true, true),
+  (26, 'Depósito Central','Bloque D - Almacén',     'Depósito de Hardware',       NULL,         NULL,         50.00, true, true)
+ON CONFLICT (codigo) DO UPDATE
+SET
+  nombre         = EXCLUDED.nombre,
+  ubicacion      = EXCLUDED.ubicacion,
+  descripcion    = EXCLUDED.descripcion,
+  latitude       = EXCLUDED.latitude,
+  longitude      = EXCLUDED.longitude,
+  radio_geofence = EXCLUDED.radio_geofence,
+  tiene_internet = EXCLUDED.tiene_internet,
+  activo         = EXCLUDED.activo;
+
+-- 7.2 Catálogo de Tipos de Activos (Código AA)
+INSERT INTO tipo_activos (codigo, nombre, descripcion, activo)
+VALUES
+  (10, 'CPU/Computadora',   'Unidad central de procesamiento',  true),
+  (20, 'RAK',               'Estructura para servidores',       true),
+  (30, 'Estabilizador',     'Dispositivo regulación de energía',true),
+  (40, 'Router',            'Dispositivo de enrutamiento red',  true),
+  (45, 'Switch',            'Dispositivo de conmutación red',   true),
+  (50, 'Teclado',           'Periférico de entrada',            true),
+  (60, 'Mouse',             'Periférico de entrada',            true),
+  (80, 'Pantalla/Monitor',  'Monitor display visual',           true),
+  (90, 'Mesa',              'Mobiliario de escritorio',         true),
+  (95, 'Silla',             'Mobiliario de asiento ergonómico', true)
+ON CONFLICT (codigo) DO UPDATE
+SET
+  nombre      = EXCLUDED.nombre,
+  descripcion = EXCLUDED.descripcion,
+  activo      = EXCLUDED.activo;
+
+-- 7.3 Usuarios del Sistema (Contraseña predeterminada: 123456789 cifrada con bcrypt)
+INSERT INTO usuarios (nombre_completo, email, password_hash, rol, activo)
+VALUES
+  ('Misael Administrador', 'misa@gmail.com',         '$2b$10$nMxbS1POpdyP/f/2YlPe6esri2F9EGvclCP0DMyRe4EvEDikS.bnq', 'admin',   true),
+  ('Carlos Técnico IT',    'tecnico@itbm.edu.bo',    '$2b$10$EMlpsD.mBk.KYqrgPKSbceZjCzKwgujNJxpeNe7DocVM1agIEK3bS', 'tecnico', true),
+  ('Ana Auditora',         'auditor@itbm.edu.bo',    '$2b$10$DjNZHQFFeVzIfokIyeLot.b6AzYYve6wL8Hxp3/B7WX/aLDWx2MKO', 'auditor', true),
+  ('Luis Auditor Campo',   'auditor2@itbm.edu.bo',   '$2b$10$kyBbA9ZbLwPUnVKA7fFfTO8M9K8TC6ckjMU9QnK/FbMkdD3abOUbe', 'auditor', true)
+ON CONFLICT (email) DO UPDATE
+SET
+  nombre_completo = EXCLUDED.nombre_completo,
+  password_hash   = EXCLUDED.password_hash,
+  rol             = EXCLUDED.rol,
+  activo          = EXCLUDED.activo;
+
+-- 7.4 Registro de Inicialización en Bitácora de Auditoría
+INSERT INTO audit_logs (accion, recurso, recurso_id, resultado, detalles, ip_address, user_agent)
+VALUES (
+  'INIT_SCHEMA',
+  'DATABASE',
+  'inventario_db',
+  'exitoso',
+  'Esquema unificado final inicializado con éxito. Catálogos, gobernanza y seguridad aplicados.',
+  '127.0.0.1',
+  'PostgreSQL Setup Script'
+);
+
+COMMIT;
+
+-- =====================================================================
+-- FIN DEL SCRIPT SQL DE LA BASE DE DATOS FINAL
+-- =====================================================================

@@ -1,6 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'package:inventario_qr_app/core/constants/api_constants.dart';
-import 'package:inventario_qr_app/core/hive/hive_manager.dart';
+import 'package:inventario_qr_app/core/storage/session_manager.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
@@ -10,10 +10,11 @@ class ApiClient {
   String get _baseUrl => ApiConstants.baseUrl;
 
   Map<String, String> _getHeaders() {
-    final token = HiveManager.getSessionBox().get('token');
+    final token = SessionManager.getToken();
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'X-Client': 'mobile',
     };
     if (token != null && token.toString().isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';

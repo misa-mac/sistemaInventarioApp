@@ -1,4 +1,4 @@
-import 'package:inventario_qr_app/core/hive/hive_manager.dart';
+import 'package:inventario_qr_app/core/storage/session_manager.dart';
 import 'package:inventario_qr_app/models/usuario_model.dart';
 import 'package:inventario_qr_app/core/network/api_client.dart';
 import 'package:inventario_qr_app/core/constants/api_constants.dart';
@@ -39,9 +39,8 @@ class AuthRepository {
           activo: true,
         );
 
-        // Guardar token JWT y sesión en Hive
-        await HiveManager.getSessionBox().put('token', token);
-        await HiveManager.getSessionBox().put('usuario', usuario.toJson());
+        // Guardar token JWT y sesión mediante SessionManager (aislado de SQLite)
+        await SessionManager.saveSession(token, usuario);
 
         debugPrint('✅ Login exitoso en servidor: ${usuario.email} (${usuario.rol})');
         return usuario;
@@ -67,20 +66,14 @@ class AuthRepository {
   }
 
   Future<void> logout() async {
-    await HiveManager.getSessionBox().delete('token');
-    await HiveManager.getSessionBox().delete('usuario');
+    await SessionManager.clearSession();
   }
 
   UsuarioModel? getUsuarioLocal() {
-    final datos = HiveManager.getSessionBox().get('usuario');
-    if (datos != null) {
-      return UsuarioModel.fromJson(Map<String, dynamic>.from(datos));
-    }
-    return null;
+    return SessionManager.getUsuario();
   }
 
   bool isLoggedIn() {
-    return HiveManager.getSessionBox().containsKey('token') &&
-           HiveManager.getSessionBox().containsKey('usuario');
+    return SessionManager.isLoggedIn();
   }
 }

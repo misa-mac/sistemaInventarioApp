@@ -8,11 +8,12 @@ const Auditoria = require('../models/Auditoria');
  */
 const logAccessDenial = async (req, accion, recursoId, razon) => {
   try {
-    const recursoPath = req.baseUrl ? `${req.baseUrl}${req.path}` : req.path;
+    const rawRecurso = req.baseUrl ? `${req.baseUrl}${req.path}` : (req.path || 'api');
+    const recursoPath = rawRecurso.length > 50 ? rawRecurso.substring(0, 50) : rawRecurso;
     await AuditLog.create({
       usuario_id: req.user?.id || null,
       accion: 'ACCESO_DENEGADO',
-      recurso: recursoPath || 'api',
+      recurso: recursoPath,
       recurso_id: recursoId ? String(recursoId) : (req.params?.id || null),
       resultado: 'fallido',
       detalles: razon,

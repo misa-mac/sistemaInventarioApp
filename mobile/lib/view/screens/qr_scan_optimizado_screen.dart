@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
@@ -19,9 +20,15 @@ class _QrScanOptimizadoScreenState extends State<QrScanOptimizadoScreen> {
   
   bool _isProcessing = false;
   String? _ultimoCodigoEscaneado;
+  static const int _cooldownDurationMs = 2500;
+  bool _enCooldown = false;
+  Timer? _cooldownTimer;
+  DateTime? _ultimoEscaneoTime;
+  final Set<String> _codigosAuditados = {};
 
   @override
   void dispose() {
+    _cooldownTimer?.cancel();
     cameraController.dispose();
     _audioPlayer.dispose();
     super.dispose();
@@ -243,49 +250,115 @@ class _QrScanOptimizadoScreenState extends State<QrScanOptimizadoScreen> {
     );
   }
 
+  void _iniciarCooldown({int durationMs = _cooldownDurationMs}) {
+    _cooldownTimer?.cancel();
+    if (mounted) setState(() => _enCooldown = true);
+    _cooldownTimer = Timer(Duration(milliseconds: durationMs), () {
+      if (mounted) {
+        setState(() {
+          _enCooldown = false;
+          _isProcessing = false;
+        });
+      }
+    });
+  }
+
   void _procesarQrOptimizado(String codigoQr) async {
-    // SIN validación de duplicado - permitir escaneos múltiples
+    final cleanCode = codigoQr.trim();
+    if (cleanCode.isEmpty || _isProcessing || _enCooldown) return;
+
+    final now = DateTime.now();
+
+    // 1. Si es el mismo código y se mantiene en foco, ignorar
+    if (_ultimoCodigoEscaneado == cleanCode) {
+      if (_ultimoEscaneoTime != null && now.difference(_ultimoEscaneoTime!).inSeconds < 5) {
+        return;
+      }
+    }
+
+    final auditoriaVM = context.read<AuditoriaViewModel>();
+
+    // 2. Si ya fue auditado en esta sesión, avisar y no duplicar
+    if (_codigosAuditados.contains(cleanCode)) {
+      _ultimoCodigoEscaneado = cleanCode;
+      _ultimoEscaneoTime = now;
+      await Vibration.vibrate(duration: 100);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('⚠️ Este equipo ya fue registrado: $cleanCode'),
+            backgroundColor: Colors.orange[800],
+            duration: const Duration(milliseconds: 1500),
+          ),
+        );
+        _iniciarCooldown(durationMs: 2000);
+      }
+      return;
+    }
+
     _isProcessing = true;
-    _ultimoCodigoEscaneado = codigoQr;
+    _ultimoCodigoEscaneado = cleanCode;
+    _ultimoEscaneoTime = now;
 
     try {
       final activoVM = context.read<ActivoViewModel>();
-      final auditoriaVM = context.read<AuditoriaViewModel>();
 
       // Procesar el QR
-      await activoVM.procesarEscaneoQr(codigoQr);
+      await activoVM.procesarEscaneoQr(cleanCode);
 
       if (activoVM.activoActual != null) {
+        final activoId = activoVM.activoActual!.id;
+
+        if (auditoriaVM.isActivoAuditado(activoId)) {
+          _codigosAuditados.add(cleanCode);
+          await Vibration.vibrate(duration: 100);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('⚠️ El activo "${activoVM.activoActual!.nombre}" ya fue auditado'),
+                backgroundColor: Colors.orange[800],
+                duration: const Duration(milliseconds: 1500),
+              ),
+            );
+            _iniciarCooldown(durationMs: 2000);
+          }
+          return;
+        }
+
         // QR válido - Registrar automáticamente
         final success = await auditoriaVM.registrarEscaneo(
-          activoVM.activoActual!.id,
+          activoId,
           'presente',
           null,
         );
 
         if (success) {
-          // Éxito - Feedback positivo
+          _codigosAuditados.add(cleanCode);
           await _reproducirSonidoExito();
           await Vibration.vibrate(duration: 50);
           
           if (mounted) {
             setState(() {});
             _mostrarNotificacionExito();
+            _iniciarCooldown(durationMs: _cooldownDurationMs);
+          }
+        } else {
+          if (mounted) {
+            _iniciarCooldown(durationMs: 1200);
           }
         }
       } else {
         // QR no encontrado - mostrar opciones
         await Vibration.vibrate(duration: 150);
         if (mounted) {
-          _mostrarQrNoEncontrado(context, codigoQr, auditoriaVM);
+          _mostrarQrNoEncontrado(context, cleanCode, auditoriaVM);
         }
       }
     } catch (e) {
       debugPrint('❌ Error: $e');
       await Vibration.vibrate(duration: 200);
-    } finally {
       if (mounted) {
-        _isProcessing = false;
+        _iniciarCooldown(durationMs: 1200);
       }
     }
   }

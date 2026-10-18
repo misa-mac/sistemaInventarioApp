@@ -34,9 +34,10 @@ dependencies:
     sdk: flutter
   # Estado y UI
   provider: ^6.0.0
-  # Almacenamiento local
-  hive: ^2.2.3
-  hive_flutter: ^1.1.0
+  # Almacenamiento local SQLite
+  sqflite: ^2.3.3+1
+  path: ^1.9.0
+  uuid: ^4.5.1
   # QR y cámara
   mobile_scanner: ^3.5.0
   # permission_handler: ^13.0.2
@@ -64,8 +65,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
-  hive_generator: ^2.0.0
-  build_runner: ^2.4.6
+  sqflite_common_ffi: ^2.3.3
   flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the

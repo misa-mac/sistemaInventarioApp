@@ -12,7 +12,7 @@ const PERMISSIONS = {
   'activos:crear': ['admin'],
   'activos:editar': ['admin'],
   // DELETE /api/activos/:id (solo baja lógica, sin borrado físico)
-  'activos:eliminar': ['admin', 'tecnico'],
+  'activos:eliminar': ['admin'],
 
   // 2. Movimientos (Traslados, Mantenimientos y Bajas)
   // GET /api/movimientos
@@ -68,7 +68,14 @@ const PERMISSIONS = {
   // 9. Registro de Acciones (audit_logs - OWASP A09)
   // GET /api/audit-logs (inferido)
   'audit_logs:listar': ['admin'],
-  'audit_logs:crear': ['admin', 'tecnico', 'auditor']
+  'audit_logs:crear': ['admin', 'tecnico', 'auditor'],
+
+  // 10. Solicitudes de Cambio (Gobernanza)
+  'solicitudes:crear': ['admin', 'tecnico'],
+  'solicitudes:listar': ['admin', 'tecnico'],
+  'solicitudes:ver': ['admin', 'tecnico'],
+  'solicitudes:aprobar': ['admin'],
+  'solicitudes:rechazar': ['admin']
 };
 
 module.exports = { PERMISSIONS };

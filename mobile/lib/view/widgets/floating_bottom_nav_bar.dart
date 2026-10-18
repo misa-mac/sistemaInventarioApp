@@ -20,6 +20,24 @@ class NavItemData {
 /// Barra de navegación inferior flotante en forma de píldora
 /// con botón central elevado para escaneo QR y destinos dinámicos por rol.
 class FloatingBottomNavBar extends StatelessWidget {
+  /// Altura intrínseca de la píldora de navegación
+  static const double pillHeight = 64.0;
+
+  /// Margen desde la barra hasta el borde inferior seguro de la pantalla
+  static const double pillBottomMargin = 12.0;
+
+  /// Separación mínima requerida entre elementos flotantes (FAB) y la barra
+  static const double minFabSpacing = 16.0;
+
+  /// Altura total que ocupa la barra inferior desde el borde físico inferior
+  /// de la pantalla (altura de la píldora + margen inferior + safeArea / insets).
+  ///
+  /// Es la ÚNICA fuente de verdad para el cálculo de insets en toda la aplicación.
+  static double totalOccupiedHeight(BuildContext context) {
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+    return pillHeight + pillBottomMargin + bottomInset;
+  }
+
   final String rol;
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -149,10 +167,12 @@ class FloatingBottomNavBar extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: leftItems
-                      .map((item) => _NavItemWidget(
-                            item: item,
-                            isSelected: currentIndex == item.tabIndex,
-                            onTap: () => onTap(item.tabIndex),
+                      .map((item) => Expanded(
+                            child: _NavItemWidget(
+                              item: item,
+                              isSelected: currentIndex == item.tabIndex,
+                              onTap: () => onTap(item.tabIndex),
+                            ),
                           ))
                       .toList(),
                 ),
@@ -166,10 +186,12 @@ class FloatingBottomNavBar extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: rightItems
-                      .map((item) => _NavItemWidget(
-                            item: item,
-                            isSelected: currentIndex == item.tabIndex,
-                            onTap: () => onTap(item.tabIndex),
+                      .map((item) => Expanded(
+                            child: _NavItemWidget(
+                              item: item,
+                              isSelected: currentIndex == item.tabIndex,
+                              onTap: () => onTap(item.tabIndex),
+                            ),
                           ))
                       .toList(),
                 ),

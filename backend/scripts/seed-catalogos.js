@@ -3,13 +3,13 @@ const Ambiente = require('../src/models/Ambiente');
 const TipoActivo = require('../src/models/TipoActivo');
 
 const ambientes = [
-  { nombre: 'Laboratorio 1', descripcion: 'Lab de computadoras', codigo: 20 },
-  { nombre: 'Laboratorio 2', descripcion: 'Lab de computadoras', codigo: 21 },
-  { nombre: 'Laboratorio 3', descripcion: 'Lab de computadoras', codigo: 22 },
-  { nombre: 'Taller 1', descripcion: 'Espacio de trabajo técnico', codigo: 23 },
-  { nombre: 'Taller 2', descripcion: 'Espacio de trabajo técnico', codigo: 24 },
-  { nombre: 'Oficina Central', descripcion: 'Oficina Administrativa IT', codigo: 25 },
-  { nombre: 'Depósito Central', descripcion: 'Depósito de Hardware', codigo: 26 }
+  { nombre: 'Laboratorio 1', descripcion: 'Lab de computadoras', codigo: 20, latitude: -16.577738, longitude: -68.196556, radio_geofence: 18 },
+  { nombre: 'Laboratorio 2', descripcion: 'Lab de computadoras', codigo: 21, latitude: -16.577660, longitude: -68.196602, radio_geofence: 17 },
+  { nombre: 'Laboratorio 3', descripcion: 'Lab de computadoras', codigo: 22, latitude: -16.577892, longitude: -68.196768, radio_geofence: 22 },
+  { nombre: 'Taller 1', descripcion: 'Espacio de trabajo técnico', codigo: 23, latitude: -16.577840, longitude: -68.196590, radio_geofence: 18 },
+  { nombre: 'Taller 2', descripcion: 'Espacio de trabajo técnico', codigo: 24, latitude: -16.577850, longitude: -68.196580, radio_geofence: 18 },
+  { nombre: 'Oficina Central', descripcion: 'Oficina Administrativa IT', codigo: 25, latitude: -16.577785, longitude: -68.196520, radio_geofence: 15 },
+  { nombre: 'Depósito Central', descripcion: 'Depósito de Hardware', codigo: 26, latitude: -16.577800, longitude: -68.196600, radio_geofence: 20 }
 ];
 
 const tipos_activos = [

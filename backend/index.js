@@ -15,6 +15,7 @@ require('./src/models/Notificacion');
 require('./src/models/Auditoria');
 require('./src/models/DetalleAuditoria');
 require('./src/models/AuditLog');
+require('./src/models/SolicitudCambio');
 
 // Importar Rutas
 const authRoutes = require('./src/routes/authRoutes');
@@ -27,6 +28,7 @@ const movimientoRoutes = require('./src/routes/movimientoRoutes');
 const notificacionRoutes = require('./src/routes/notificacionRoutes');
 const auditoriaRoutes = require('./src/routes/auditoriaRoutes');
 const auditLogRoutes = require('./src/routes/auditLogRoutes');
+const solicitudRoutes = require('./src/routes/solicitudRoutes');
 
 dotenv.config();
 
@@ -51,6 +53,7 @@ app.use('/api/movimientos', movimientoRoutes);
 app.use('/api/notificaciones', notificacionRoutes);
 app.use('/api/auditorias', auditoriaRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
+app.use('/api/solicitudes', solicitudRoutes);
 
 // Configuración Servidor
 const PORT = process.env.PORT || 3000;
@@ -73,9 +76,14 @@ const startServer = async () => {
   // Validación estricta de seguridad Deny-By-Default (Regla 2)
   validateAppSecurity(app);
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`✅ Servidor corriendo en puerto ${PORT}`);
   });
+  return server;
 };
 
-startServer();
+if (process.env.NODE_ENV !== 'test') {
+  startServer();
+}
+
+module.exports = app;

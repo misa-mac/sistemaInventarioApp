@@ -346,7 +346,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   children: [
                     const Text(
-                      'Instituto Tecnológico Boliviano Alemán',
+                      'Instituto Tecnológico Bolivia Mar',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontFamily: 'Poppins',

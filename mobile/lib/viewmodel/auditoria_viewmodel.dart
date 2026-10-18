@@ -12,6 +12,7 @@ class AuditoriaViewModel extends ChangeNotifier {
   int _escaneosCont = 0;
   AuditoriaModel? _ultimaAuditoria;
   List<DetalleAuditoriaModel> _movimientosRecientes = [];
+  final Set<String> _activosAuditadosIds = {};
 
   // Getters
   AuditoriaModel? get auditoriaActual => _auditoriaActual;
@@ -21,6 +22,8 @@ class AuditoriaViewModel extends ChangeNotifier {
   int get escaneosCont => _escaneosCont;
   AuditoriaModel? get ultimaAuditoria => _ultimaAuditoria;
   List<DetalleAuditoriaModel> get movimientosRecientes => _movimientosRecientes;
+  Set<String> get activosAuditadosIds => _activosAuditadosIds;
+  bool isActivoAuditado(String activoId) => _activosAuditadosIds.contains(activoId);
 
   Future<bool> iniciarAuditoria(
     String ambienteId,
@@ -31,6 +34,7 @@ class AuditoriaViewModel extends ChangeNotifier {
     _error = null;
     _escaneosCont = 0;
     _detalles = [];
+    _activosAuditadosIds.clear();
     notifyListeners();
 
     try {
@@ -75,6 +79,7 @@ class AuditoriaViewModel extends ChangeNotifier {
       );
 
       if (resultado) {
+        _activosAuditadosIds.add(activoId);
         _escaneosCont++;
         debugPrint('✅ Escaneo registrado. Total: $_escaneosCont');
         notifyListeners(); // ← CRÍTICO: Actualizar UI
@@ -210,5 +215,18 @@ class AuditoriaViewModel extends ChangeNotifier {
     } catch (e) {
       debugPrint('❌ Error limpiando duplicados: $e');
     }
+  }
+
+  @visibleForTesting
+  void setAuditoriaActualForTesting(AuditoriaModel auditoria) {
+    _auditoriaActual = auditoria;
+  }
+
+  @visibleForTesting
+  void reiniciarSesionForTesting() {
+    _escaneosCont = 0;
+    _detalles = [];
+    _activosAuditadosIds.clear();
+    notifyListeners();
   }
 }

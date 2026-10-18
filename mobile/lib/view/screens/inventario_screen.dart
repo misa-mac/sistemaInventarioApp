@@ -5,6 +5,8 @@ import 'package:inventario_qr_app/viewmodel/ambiente_viewmodel.dart';
 import 'package:inventario_qr_app/viewmodel/activo_viewmodel.dart';
 import 'package:inventario_qr_app/viewmodel/auth_viewmodel.dart';
 import 'package:inventario_qr_app/models/ambiente_model.dart';
+import 'package:inventario_qr_app/view/widgets/error_state.dart';
+import 'package:inventario_qr_app/view/widgets/floating_bottom_nav_bar.dart';
 
 class InventarioScreen extends StatefulWidget {
   const InventarioScreen({super.key});
@@ -233,33 +235,11 @@ class _InventarioScreenState extends State<InventarioScreen> {
                   }
 
                   if (ambienteVM.ambientes.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.domain_disabled_rounded,
-                            size: 64,
-                            color: AppColors.iconInactive.withValues(alpha: 0.5),
-                          ),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'No hay ambientes disponibles',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          ElevatedButton.icon(
-                            onPressed: () => ambienteVM.cargarAmbientes(),
-                            icon: const Icon(Icons.refresh_rounded, size: 18),
-                            label: const Text('Reintentar'),
-                          ),
-                        ],
-                      ),
+                    return ErrorState(
+                      icon: Icons.domain_disabled_rounded,
+                      titulo: 'No hay ambientes disponibles',
+                      error: ambienteVM.error,
+                      onRetry: () => ambienteVM.cargarAmbientes(),
                     );
                   }
 
@@ -299,10 +279,12 @@ class _InventarioScreenState extends State<InventarioScreen> {
                     );
                   }
 
+                  final bottomInset = FloatingBottomNavBar.totalOccupiedHeight(context);
+
                   return RefreshIndicator(
                     onRefresh: () => ambienteVM.cargarAmbientes(),
                     child: ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                      padding: EdgeInsets.fromLTRB(16, 8, 16, bottomInset + 24),
                       itemCount: filteredAmbientes.length,
                       itemBuilder: (context, index) {
                         final ambiente = filteredAmbientes[index];

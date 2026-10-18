@@ -12,6 +12,10 @@ class AmbienteViewModel extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   bool _dentroDeGeofence = false;
+  double? _distanciaActual;
+  double? _precisionActual;
+  GeofenceCheckResult? _resultadoGeocerca;
+  String? _mensajeUbicacion;
 
   // Getters
   List<AmbienteModel> get ambientes => _ambientes;
@@ -19,6 +23,10 @@ class AmbienteViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get dentroDeGeofence => _dentroDeGeofence;
+  double? get distanciaActual => _distanciaActual;
+  double? get precisionActual => _precisionActual;
+  GeofenceCheckResult? get resultadoGeocerca => _resultadoGeocerca;
+  String? get mensajeUbicacion => _mensajeUbicacion;
 
   Future<void> cargarAmbientes() async {
     _isLoading = true;
@@ -39,6 +47,10 @@ class AmbienteViewModel extends ChangeNotifier {
   Future<void> seleccionarAmbiente(AmbienteModel ambiente) async {
     _ambienteSeleccionado = ambiente;
     _dentroDeGeofence = false;
+    _distanciaActual = null;
+    _precisionActual = null;
+    _resultadoGeocerca = null;
+    _mensajeUbicacion = null;
     notifyListeners();
 
     // Verificar ubicación
@@ -52,19 +64,32 @@ class AmbienteViewModel extends ChangeNotifier {
       final posicion = await _locationService.getCurrentLocation();
       
       if (posicion != null) {
-        _dentroDeGeofence = _locationService.isInGeofence(
+        _precisionActual = posicion.accuracy;
+        _distanciaActual = _locationService.calculateDistance(
           posicion.latitude,
           posicion.longitude,
           _ambienteSeleccionado!.latitude,
           _ambienteSeleccionado!.longitude,
-          _ambienteSeleccionado!.radioGeofence,
         );
+        _resultadoGeocerca = _locationService.evaluateGeofence(
+          position: posicion,
+          targetLat: _ambienteSeleccionado!.latitude,
+          targetLon: _ambienteSeleccionado!.longitude,
+          radiusMeters: _ambienteSeleccionado!.radioGeofence,
+          ambienteNombre: _ambienteSeleccionado!.nombre,
+        );
+        _dentroDeGeofence = _resultadoGeocerca!.isInside;
+        _mensajeUbicacion = _resultadoGeocerca!.message;
+        _error = null;
       } else {
-        _error = 'No se pudo obtener la ubicación';
+        _dentroDeGeofence = false;
+        _error = 'Precisión GPS insuficiente (> 30m) o servicio de ubicación desactivado. Reintente en un área más despejada.';
+        _mensajeUbicacion = _error;
       }
       notifyListeners();
     } catch (e) {
       _error = 'Error verificando ubicación: $e';
+      _mensajeUbicacion = _error;
       notifyListeners();
     }
   }
@@ -72,6 +97,10 @@ class AmbienteViewModel extends ChangeNotifier {
   void limpiarSeleccion() {
     _ambienteSeleccionado = null;
     _dentroDeGeofence = false;
+    _distanciaActual = null;
+    _precisionActual = null;
+    _resultadoGeocerca = null;
+    _mensajeUbicacion = null;
     _error = null;
     notifyListeners();
   }

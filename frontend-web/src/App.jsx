@@ -9,8 +9,9 @@ import UsuariosPage from './pages/UsuariosPage';
 import DashboardPage from './pages/DashboardPage';
 import ConfiguracionPage from './pages/ConfiguracionPage';
 import HistorialPage from './pages/HistorialPage';
+import SolicitudesPage from './pages/SolicitudesPage';
 import api from './services/api';
-import { LayoutDashboard, Monitor, LogOut, Settings, Bell, Search, Menu, FileText, Building, Shield, Users, AlertTriangle, Info, Clock } from 'lucide-react';
+import { LayoutDashboard, Monitor, LogOut, Settings, Bell, Search, Menu, FileText, Building, Shield, Users, AlertTriangle, Info, Clock, Layers } from 'lucide-react';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useAuth();
@@ -19,10 +20,34 @@ const ProtectedRoute = ({ children }) => {
 
 const Sidebar = () => {
   const location = useLocation();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const [pendientesCount, setPendientesCount] = useState(0);
+
+  const fetchPendientes = async () => {
+    if (user?.rol === 'admin') {
+      try {
+        const res = await api.get('/solicitudes/pendientes-count');
+        setPendientesCount(res.data.count || 0);
+      } catch (err) {
+        // Silently catch in sidebar
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchPendientes();
+    const interval = setInterval(fetchPendientes, 30000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   const menuItems = [
     { path: '/', icon: <LayoutDashboard size={20} />, label: 'Panel de Control' },
+    ...(user?.rol === 'admin' ? [{ 
+      path: '/solicitudes', 
+      icon: <Layers size={20} />, 
+      label: 'Solicitudes',
+      badge: pendientesCount 
+    }] : []),
     { path: '/inventario', icon: <Monitor size={20} />, label: 'Activos Fijos' },
     { path: '/ambientes', icon: <Building size={20} />, label: 'Ambientes' },
     { path: '/historial', icon: <Clock size={20} />, label: 'Movimientos' },
@@ -68,16 +93,23 @@ const Sidebar = () => {
             <Link
               key={item.label}
               to={item.path}
-              className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-sm font-medium ${
+              className={`flex items-center justify-between px-3 py-2 rounded-md transition-colors text-sm font-medium ${
                 isActive 
                   ? 'bg-secondary-container/10 text-secondary' 
                   : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface'
               }`}
             >
-              <span className={`${isActive ? 'text-secondary' : 'text-outline'}`}>
-                {item.icon}
-              </span>
-              {item.label}
+              <div className="flex items-center gap-3">
+                <span className={`${isActive ? 'text-secondary' : 'text-outline'}`}>
+                  {item.icon}
+                </span>
+                {item.label}
+              </div>
+              {item.badge > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500 text-white shadow-xs">
+                  {item.badge}
+                </span>
+              )}
             </Link>
           );
         })}
@@ -235,6 +267,16 @@ function AppContent() {
     <Router>
       <Routes>
         <Route path="/login" element={isAuthenticated ? <Navigate to="/" /> : <LoginPage />} />
+        <Route 
+          path="/solicitudes" 
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <SolicitudesPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          } 
+        />
         <Route 
           path="/inventario" 
           element={

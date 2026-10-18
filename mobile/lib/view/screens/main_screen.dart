@@ -201,14 +201,30 @@ class _MainScreenState extends State<MainScreen> {
     }
 
     final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+    final bottomBarHeight = isKeyboardOpen ? 0.0 : FloatingBottomNavBar.totalOccupiedHeight(context);
+
+    // Definición centralizada: el MediaQuery inyecta la altura ocupada por la barra
+    // inferior flotante para que todos los Scaffolds, FABs y Listas hijos la respeten automáticamente.
+    final currentMq = MediaQuery.of(context);
+    final scopedMq = currentMq.copyWith(
+      padding: currentMq.padding.copyWith(
+        bottom: isKeyboardOpen ? currentMq.padding.bottom : bottomBarHeight,
+      ),
+      viewPadding: currentMq.viewPadding.copyWith(
+        bottom: isKeyboardOpen ? currentMq.viewPadding.bottom : bottomBarHeight,
+      ),
+    );
 
     return Scaffold(
       body: Stack(
         children: [
           Positioned.fill(
-            child: IndexedStack(
-              index: _selectedIndex,
-              children: screens,
+            child: MediaQuery(
+              data: scopedMq,
+              child: IndexedStack(
+                index: _selectedIndex,
+                children: screens,
+              ),
             ),
           ),
           const Positioned(

@@ -159,13 +159,26 @@ class _SelectAmbienteAuditoriaScreenState extends State<SelectAmbienteAuditoriaS
     final activoVM = context.read<ActivoViewModel>();
     await activoVM.cargarActivosPorAmbiente(ambiente.id);
 
-    // Verificar ubicación (solo aviso, no bloquea)
+    // Verificar ubicación (aviso informativo con precisión y distancia)
     if (!ambienteVM.dentroDeGeofence) {
       if (context.mounted) {
+        final msg = ambienteVM.mensajeUbicacion ?? '⚠️ Fuera de la geocerca permitida de ${ambiente.nombre}';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('⚠️ No estás en el laboratorio ${ambiente.nombre}'),
-            backgroundColor: Colors.orange,
+            content: Text(msg),
+            backgroundColor: Colors.orange[800],
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } else {
+      if (context.mounted) {
+        final dist = ambienteVM.distanciaActual?.toStringAsFixed(1) ?? '0';
+        final acc = ambienteVM.precisionActual?.toStringAsFixed(1) ?? '0';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Ubicación verificada en ${ambiente.nombre} (a $dist m, GPS: ±$acc m)'),
+            backgroundColor: Colors.green[700],
             duration: const Duration(seconds: 2),
           ),
         );

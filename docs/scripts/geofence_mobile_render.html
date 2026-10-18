@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body {
+    margin: 0;
+    padding: 24px;
+    background: #121212;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+  .phone-frame {
+    width: 420px;
+    background: #0f172a;
+    border-radius: 36px;
+    border: 8px solid #1e293b;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.9);
+    overflow: hidden;
+    color: #f8fafc;
+  }
+  .status-bar {
+    height: 32px;
+    background: #0f172a;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #94a3b8;
+  }
+  .app-bar {
+    background: #1e3a8a;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  .app-bar h1 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+  .content {
+    padding: 18px;
+    background: #0f172a;
+  }
+  .card {
+    background: #1e293b;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 14px;
+    border: 1px solid #334155;
+  }
+  .card-selected {
+    border: 2px solid #2563eb;
+    background: #1e293b;
+  }
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .room-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+  .room-desc {
+    font-size: 13px;
+    color: #94a3b8;
+    margin-top: 4px;
+  }
+  .badge-radius {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #1e3a8a;
+    color: #93c5fd;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-top: 10px;
+    border: 1px solid #3b82f6;
+  }
+  .gps-box {
+    background: #022c22;
+    border: 1px solid #059669;
+    border-radius: 12px;
+    padding: 14px;
+    margin-top: 14px;
+  }
+  .gps-status {
+    color: #34d399;
+    font-size: 13.5px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .gps-detail {
+    font-size: 12px;
+    color: #a7f3d0;
+    margin-top: 6px;
+    line-height: 1.4;
+  }
+  .telemetry-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .telemetry-box {
+    flex: 1;
+    background: #1e293b;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #334155;
+    text-align: center;
+  }
+  .telemetry-val {
+    font-size: 18px;
+    font-weight: 800;
+    color: #38bdf8;
+  }
+  .telemetry-lbl {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 2px;
+  }
+  .action-btn {
+    width: 100%;
+    background: #2563eb;
+    color: white;
+    border: none;
+    padding: 14px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    margin-top: 18px;
+    box-shadow: 0 4px 14px rgba(37,99,235,0.4);
+  }
+</style>
+</head>
+<body>
+<div class="phone-frame">
+  <div class="status-bar">
+    <span>10:30</span>
+    <span>&#9679; GPS ACTIVO &#9679; 94%</span>
+  </div>
+  <div class="app-bar">
+    <span style="font-size: 20px;">&larr;</span>
+    <h1>Seleccionar Ambiente para Auditoría</h1>
+  </div>
+  <div class="content">
+    <div class="card card-selected">
+      <div class="card-header">
+        <div>
+          <div class="room-title">Laboratorio 1</div>
+          <div class="room-desc">Lab de computadoras y servidores</div>
+        </div>
+        <span style="color: #2563eb; font-size: 18px;">&#10004;</span>
+      </div>
+      <div class="badge-radius">&#128205; 18m de radio configurado</div>
+      
+      <div class="gps-box">
+        <div class="gps-status">&#10004; Ubicación Verificada: Dentro del Laboratorio</div>
+        <div class="gps-detail">
+          Usuario ubicado a <b>4.2 m</b> del centroide.<br>
+          Precisión GPS: <b>&plusmn;11.8 m</b> (Cumple regla: &le; 30 m).
+        </div>
+      </div>
+
+      <div class="telemetry-row">
+        <div class="telemetry-box">
+          <div class="telemetry-val">4.2 m</div>
+          <div class="telemetry-lbl">Distancia al Centro</div>
+        </div>
+        <div class="telemetry-box">
+          <div class="telemetry-val">18 m</div>
+          <div class="telemetry-lbl">Radio Geocerca</div>
+        </div>
+        <div class="telemetry-box">
+          <div class="telemetry-val" style="color: #34d399;">&plusmn;11.8 m</div>
+          <div class="telemetry-lbl">Precisión GPS</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="room-title">Laboratorio 2</div>
+      <div class="room-desc">Lab de computadoras</div>
+      <div class="badge-radius">&#128205; 17m de radio configurado</div>
+    </div>
+
+    <div class="card">
+      <div class="room-title">Laboratorio 3</div>
+      <div class="room-desc">Lab de computadoras</div>
+      <div class="badge-radius">&#128205; 22m de radio configurado</div>
+    </div>
+
+    <button class="action-btn">Iniciar Auditoría en Laboratorio 1</button>
+  </div>
+</div>
+</body>
+</html>
