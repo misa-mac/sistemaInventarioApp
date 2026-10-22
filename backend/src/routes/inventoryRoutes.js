@@ -14,6 +14,7 @@ router.get('/ultimo', auth, authorize('activos:ver'), inventoryController.getUlt
 router.get('/search/:q', auth, authorize('activos:ver'), inventoryController.getBySearch);
 router.get('/:id', auth, authorize('activos:ver'), inventoryController.getById);
 
+router.post('/bulk-import', auth, authorize('activos:crear'), blockMobileClient, inventoryController.bulkImport);
 router.post('/', auth, authorize('activos:crear'), blockMobileClient, upload.single('imagen'), inventoryController.create);
 router.put('/:id', auth, authorize('activos:editar'), blockMobileClient, upload.single('imagen'), inventoryController.update);
 router.delete('/:id', auth, authorize('activos:eliminar'), blockMobileClient, inventoryController.delete);

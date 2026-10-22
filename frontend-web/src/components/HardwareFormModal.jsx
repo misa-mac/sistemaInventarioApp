@@ -332,7 +332,9 @@ const HardwareFormModal = ({ isOpen, onClose, onSuccess, editData }) => {
                   >
                     <option value="">Seleccione...</option>
                     {ambientes.map((amb) => (
-                      <option key={amb.id} value={amb.id}>{amb.nombre} ({amb.codigo})</option>
+                      <option key={amb.id} value={amb.id}>
+                        {amb.nombre} {amb.ubicacion ? `— ${amb.ubicacion}` : ''} (CC: {amb.codigo.toString().padStart(2, '0')})
+                      </option>
                     ))}
                   </select>
                 </div>

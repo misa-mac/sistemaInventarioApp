@@ -176,7 +176,9 @@ const EventoFormModal = ({ isOpen, onClose, onSuccess }) => {
                 >
                   <option value="">-- Seleccionar Nuevo Ambiente --</option>
                   {ambientes.filter(amb => amb.id !== selectedActivo?.ambiente_id).map(amb => (
-                    <option key={amb.id} value={amb.id}>{amb.nombre}</option>
+                    <option key={amb.id} value={amb.id}>
+                      {amb.nombre} {amb.ubicacion ? `(${amb.ubicacion})` : ''}
+                    </option>
                   ))}
                 </select>
               </div>

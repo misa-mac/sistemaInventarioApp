@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
-import { Plus, Edit2, Trash2, Settings, Server, Layers, X, Database } from 'lucide-react';
+import { Plus, Edit2, Trash2, Settings, Server, Layers, X, Database, FileSpreadsheet } from 'lucide-react';
+import ImportarDatosTab from '../components/ImportarDatosTab';
 
 const TipoActivoFormModal = ({ isOpen, onClose, onSuccess, editData }) => {
   const [formData, setFormData] = useState({
@@ -172,17 +173,31 @@ const ConfiguracionPage = () => {
       <div className="flex gap-6 flex-col md:flex-row">
         
         {/* Sidebar Nav */}
-        <div className="w-full md:w-64 flex flex-col gap-2">
+        <div className="w-full md:w-64 flex flex-col gap-2 shrink-0">
           <button 
             onClick={() => setActiveTab('catalogos')}
-            className={`flex items-center gap-3 p-3 rounded-lg text-sm font-medium transition-colors text-left ${activeTab === 'catalogos' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:bg-surface-container-low'}`}
+            className={`flex items-center gap-3 p-3.5 rounded-xl text-sm font-medium transition-all text-left ${activeTab === 'catalogos' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low'}`}
           >
             <Database size={18} />
             Catálogo de Hardware
           </button>
+
+          <button 
+            onClick={() => setActiveTab('importar')}
+            className={`flex items-center justify-between p-3.5 rounded-xl text-sm font-medium transition-all text-left ${activeTab === 'importar' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low'}`}
+          >
+            <div className="flex items-center gap-3">
+              <FileSpreadsheet size={18} />
+              <span>Importar Datos (Excel)</span>
+            </div>
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${activeTab === 'importar' ? 'bg-white/20 text-white' : 'bg-[#22c55e]/20 text-[#22c55e]'}`}>
+              Nuevo
+            </span>
+          </button>
+
           <button 
             onClick={() => setActiveTab('sistema')}
-            className={`flex items-center gap-3 p-3 rounded-lg text-sm font-medium transition-colors text-left ${activeTab === 'sistema' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:bg-surface-container-low'}`}
+            className={`flex items-center gap-3 p-3.5 rounded-xl text-sm font-medium transition-all text-left ${activeTab === 'sistema' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-low'}`}
           >
             <Server size={18} />
             Parámetros del Sistema
@@ -281,6 +296,10 @@ const ConfiguracionPage = () => {
 
               </div>
             </div>
+          )}
+
+          {activeTab === 'importar' && (
+            <ImportarDatosTab />
           )}
 
         </div>

@@ -365,3 +365,108 @@ exports.delete = async (req, res) => {
     res.status(500).json({ message: 'Error al dar de baja el activo: ' + error.message });
   }
 };
+
+exports.bulkImport = async (req, res) => {
+  try {
+    const { items } = req.body;
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: 'Se requiere una lista de activos no vacía (items).' });
+    }
+
+    const allTipos = await TipoActivo.findAll();
+    const allAmbientes = await Ambiente.findAll();
+
+    const t = await sequelize.transaction();
+    const created = [];
+    const errors = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const raw = items[i];
+      const rowNum = i + 1;
+
+      // 1. Resolver Tipo de Activo
+      let tipo = null;
+      if (raw.tipo_activo_id && isUuid(raw.tipo_activo_id)) {
+        tipo = allTipos.find(tp => tp.id === raw.tipo_activo_id);
+      }
+      if (!tipo && raw.tipo_codigo !== undefined && raw.tipo_codigo !== null && raw.tipo_codigo !== '') {
+        const codNum = parseInt(raw.tipo_codigo, 10);
+        tipo = allTipos.find(tp => tp.codigo === codNum);
+      }
+      if (!tipo && (raw.tipo || raw.tipo_nombre || raw.categoria)) {
+        const queryName = (raw.tipo || raw.tipo_nombre || raw.categoria).toString().toLowerCase().trim();
+        tipo = allTipos.find(tp => tp.nombre.toLowerCase().trim() === queryName || tp.nombre.toLowerCase().includes(queryName));
+      }
+      if (!tipo) {
+        tipo = allTipos[0];
+      }
+
+      // 2. Resolver Ambiente
+      let amb = null;
+      if (raw.ambiente_id && isUuid(raw.ambiente_id)) {
+        amb = allAmbientes.find(a => a.id === raw.ambiente_id);
+      }
+      if (!amb && raw.ambiente_codigo !== undefined && raw.ambiente_codigo !== null && raw.ambiente_codigo !== '') {
+        const codNum = parseInt(raw.ambiente_codigo, 10);
+        amb = allAmbientes.find(a => a.codigo === codNum);
+      }
+      if (!amb && (raw.ambiente || raw.ambiente_nombre || raw.laboratorio)) {
+        const queryName = (raw.ambiente || raw.ambiente_nombre || raw.laboratorio).toString().toLowerCase().trim();
+        amb = allAmbientes.find(a => a.nombre.toLowerCase().trim() === queryName || a.nombre.toLowerCase().includes(queryName));
+      }
+      if (!amb) {
+        errors.push(`Fila #${rowNum}: No se encontró el ambiente '${raw.ambiente || raw.ambiente_codigo || 'desconocido'}'.`);
+        continue;
+      }
+
+      // 3. Normalizar datos
+      const estadoNorm = normalizeEstado(raw.estado);
+      const valorNum = (raw.valor !== undefined && raw.valor !== null && raw.valor !== '') ? parseFloat(raw.valor) : null;
+      let fechaIngreso = null;
+      if (raw.fecha_ingreso) {
+        const parsedDate = new Date(raw.fecha_ingreso);
+        if (!isNaN(parsedDate.getTime())) {
+          fechaIngreso = parsedDate.toISOString().split('T')[0];
+        }
+      }
+
+      const itemPayload = {
+        nombre: (raw.nombre && raw.nombre.toString().trim()) || `${tipo ? tipo.nombre : 'Activo'} ${raw.marca || ''}`.trim(),
+        tipo_activo_id: tipo ? tipo.id : null,
+        ambiente_id: amb.id,
+        ambiente_registro_id: amb.id,
+        marca: raw.marca ? raw.marca.toString().trim() : null,
+        modelo: raw.modelo ? raw.modelo.toString().trim() : null,
+        numero_serie: raw.numero_serie ? raw.numero_serie.toString().trim() : null,
+        estado: estadoNorm,
+        origen: raw.origen ? raw.origen.toString().trim() : 'Compra institucional',
+        especificacion_origen: raw.especificacion_origen ? raw.especificacion_origen.toString().trim() : null,
+        valor: isNaN(valorNum) ? null : valorNum,
+        fecha_ingreso: fechaIngreso,
+        descripcion: raw.descripcion ? raw.descripcion.toString().trim() : null,
+        observaciones: raw.observaciones ? raw.observaciones.toString().trim() : null,
+        responsable: raw.responsable ? raw.responsable.toString().trim() : null
+      };
+
+      const nuevoActivo = await Activo.create(itemPayload, { transaction: t });
+      created.push(nuevoActivo);
+    }
+
+    if (errors.length > 0 && created.length === 0) {
+      await t.rollback();
+      return res.status(400).json({ message: 'No se pudo importar ningún activo.', errors });
+    }
+
+    await t.commit();
+    res.status(201).json({
+      success: true,
+      count: created.length,
+      errors: errors.length > 0 ? errors : undefined,
+      message: `Se han importado exitosamente ${created.length} activo(s).`
+    });
+  } catch (err) {
+    console.error('Error en bulkImport:', err);
+    res.status(500).json({ message: 'Error durante la importación masiva: ' + err.message });
+  }
+};
+

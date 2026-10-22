@@ -291,9 +291,11 @@ const InventoryPage = () => {
                         </div>
                       )}
 
-                      <div className="text-xs text-outline mt-1 truncate border-t border-surface-container pt-1.5 flex justify-between">
-                        <span>{item.ambiente?.nombre || 'Sin ambiente'}</span>
-                        {item.valor && <span className="font-mono text-on-surface font-medium">Bs. {item.valor}</span>}
+                      <div className="text-xs text-outline mt-1 truncate border-t border-surface-container pt-1.5 flex justify-between items-center gap-2">
+                        <span className="truncate" title={item.ambiente?.ubicacion ? `${item.ambiente.nombre} (${item.ambiente.ubicacion})` : item.ambiente?.nombre}>
+                          {item.ambiente?.nombre ? `${item.ambiente.nombre}${item.ambiente.ubicacion ? ` • ${item.ambiente.ubicacion}` : ''}` : 'Sin ambiente'}
+                        </span>
+                        {item.valor && <span className="font-mono text-on-surface font-medium shrink-0">Bs. {item.valor}</span>}
                       </div>
                     </div>
                   </div>
