@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 import 'package:inventario_qr_app/core/theme/app_theme.dart';
+import 'package:inventario_qr_app/core/storage/session_manager.dart';
 import 'package:inventario_qr_app/viewmodel/auth_viewmodel.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -61,6 +63,190 @@ class _LoginScreenState extends State<LoginScreen> {
     if (success && context.mounted) {
       Navigator.of(context).pushReplacementNamed('/main');
     }
+  }
+
+  void _showServerConfigDialog(BuildContext context) {
+    final serverController = TextEditingController(text: SessionManager.getServerHost());
+    bool isTesting = false;
+    String? testResult;
+    bool testSuccess = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: const Row(
+                children: [
+                  Icon(Icons.wifi_rounded, color: AppColors.brandBlue),
+                  SizedBox(width: 8),
+                  Text(
+                    'Servidor Backend',
+                    style: TextStyle(fontFamily: 'Poppins', fontSize: 17, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Configura la IP de tu computadora para que la app funcione sin cable por Wi-Fi o desde otros dispositivos en la red:',
+                      style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: serverController,
+                      decoration: const InputDecoration(
+                        labelText: 'IP o Host del Servidor',
+                        hintText: '10.10.3.5',
+                        prefixIcon: Icon(Icons.dns_outlined, color: AppColors.brandBlue),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Accesos rápidos:',
+                      style: TextStyle(fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        ActionChip(
+                          label: const Text('Wi-Fi (10.10.3.5)', style: TextStyle(fontSize: 11)),
+                          onPressed: () {
+                            setDialogState(() {
+                              serverController.text = '10.10.3.5';
+                              testResult = null;
+                            });
+                          },
+                        ),
+                        ActionChip(
+                          label: const Text('Cable USB (localhost)', style: TextStyle(fontSize: 11)),
+                          onPressed: () {
+                            setDialogState(() {
+                              serverController.text = 'localhost';
+                              testResult = null;
+                            });
+                          },
+                        ),
+                        ActionChip(
+                          label: const Text('Emulador (10.0.2.2)', style: TextStyle(fontSize: 11)),
+                          onPressed: () {
+                            setDialogState(() {
+                              serverController.text = '10.0.2.2';
+                              testResult = null;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    if (testResult != null) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: testSuccess ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              testSuccess ? Icons.check_circle_outline : Icons.error_outline,
+                              color: testSuccess ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                testResult!,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: testSuccess ? const Color(0xFF15803D) : const Color(0xFFB91C1C),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isTesting
+                      ? null
+                      : () async {
+                          setDialogState(() {
+                            isTesting = true;
+                            testResult = null;
+                          });
+                          final host = serverController.text.trim();
+                          try {
+                            String testUrl = host;
+                            if (!testUrl.startsWith('http://') && !testUrl.startsWith('https://')) {
+                              testUrl = testUrl.contains(':') ? 'http://$testUrl' : 'http://$testUrl:3000';
+                            }
+                            if (testUrl.endsWith('/')) {
+                              testUrl = testUrl.substring(0, testUrl.length - 1);
+                            }
+                            final uri = Uri.parse(testUrl.endsWith('/api') ? '$testUrl/inventory' : '$testUrl/api/inventory');
+                            final res = await http.get(uri).timeout(const Duration(seconds: 4));
+                            setDialogState(() {
+                              isTesting = false;
+                              testSuccess = (res.statusCode < 500);
+                              testResult = testSuccess
+                                  ? '¡Conexión establecida exitosamente!'
+                                  : 'Respondió con código ${res.statusCode}';
+                            });
+                          } catch (e) {
+                            setDialogState(() {
+                              isTesting = false;
+                              testSuccess = false;
+                              testResult = 'No se pudo conectar a $host:3000. Revisa que estén en la misma red Wi-Fi.';
+                            });
+                          }
+                        },
+                  child: isTesting
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Probar Conexión'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryNavy,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () async {
+                    final host = serverController.text.trim();
+                    if (host.isNotEmpty) {
+                      await SessionManager.saveServerHost(host);
+                      if (context.mounted) {
+                        setState(() {});
+                        Navigator.of(dialogCtx).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Servidor guardado: $host:3000'),
+                            backgroundColor: AppColors.brandBlue,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('Guardar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -159,23 +345,38 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Iniciar Sesión',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Ingresa tus credenciales institucionales',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 12,
-                              color: AppColors.iconInactive,
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Iniciar Sesión',
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'Ingresa tus credenciales institucionales',
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 12,
+                                      color: AppColors.iconInactive,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.wifi_rounded, color: AppColors.brandBlue, size: 22),
+                                tooltip: 'Configurar IP del Servidor',
+                                onPressed: () => _showServerConfigDialog(context),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 24),
 
@@ -330,6 +531,37 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               );
                             },
+                          ),
+                          const SizedBox(height: 18),
+                          Center(
+                            child: InkWell(
+                              onTap: () => _showServerConfigDialog(context),
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.brandBlue.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: AppColors.brandBlue.withValues(alpha: 0.2)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.wifi_rounded, size: 14, color: AppColors.brandBlue),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Servidor: ${SessionManager.getServerHost()}:3000',
+                                      style: const TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.brandBlue,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),

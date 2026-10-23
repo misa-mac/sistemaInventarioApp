@@ -17,8 +17,11 @@ const login = async (req, res) => {
   const { email, password } = value;
 
   try {
-    const cleanEmail = email.toLowerCase().trim();
-    const user = await Usuario.findOne({ where: { email: cleanEmail } });
+    let cleanEmail = email.toLowerCase().trim();
+    let user = await Usuario.findOne({ where: { email: cleanEmail } });
+    if (!user && cleanEmail.endsWith('@itbm.edu')) {
+      user = await Usuario.findOne({ where: { email: `${cleanEmail}.bo` } });
+    }
 
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
       return res.status(401).json({ error: 'Credenciales inválidas.' });

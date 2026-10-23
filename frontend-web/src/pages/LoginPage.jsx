@@ -62,7 +62,7 @@ const LoginPage = () => {
               <input
                 type="email"
                 className="w-full pl-10 pr-4 py-2 bg-surface-container-lowest border border-outline-variant rounded focus:border-secondary focus:ring-2 focus:ring-secondary/20 focus:outline-none transition-all text-on-surface text-body-main"
-                placeholder="usuario@itbm.edu"
+                placeholder="usuario@itbm.edu.bo"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required

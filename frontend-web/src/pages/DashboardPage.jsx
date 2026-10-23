@@ -33,8 +33,8 @@ const DashboardPage = () => {
     fetchSummary();
   }, []);
 
-  const activosCount = summary?.porEstado.find(e => e.estado === 'Activo')?.cantidad || 0;
-  const danadosCount = summary?.porEstado.find(e => e.estado === 'Dañado')?.cantidad || 0;
+  const activosCount = summary?.porEstado?.find(e => e.estado === 'Activo')?.cantidad || 0;
+  const danadosCount = summary?.porEstado?.find(e => e.estado === 'Dañado')?.cantidad || 0;
   const total = summary?.totalActivos || 0;
 
   const getGreeting = () => {
