@@ -57,6 +57,13 @@ export default {
         "gutter": "16px",
         "container-margin": "24px"
       },
+      zIndex: {
+        '60': '60',
+        '70': '70',
+        '80': '80',
+        '90': '90',
+        '100': '100',
+      },
       fontFamily: {
         "body-main": ["Inter"],
         "h1": ["Inter"],

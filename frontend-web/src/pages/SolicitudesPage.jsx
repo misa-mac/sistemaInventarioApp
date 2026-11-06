@@ -603,7 +603,7 @@ const SolicitudesPage = () => {
 
       {/* MODAL DE CONFIRMACIÓN: APROBAR */}
       {isAprobarModalOpen && selectedSolicitud && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-60 p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
           <div className="bg-surface-container-lowest rounded-xl border border-surface-container-highest shadow-xl w-full max-w-md p-6 animate-fade-in">
             <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-4">
               <CheckCircle2 size={26} />
@@ -644,7 +644,7 @@ const SolicitudesPage = () => {
 
       {/* MODAL DE RECHAZO: EXIGE COMENTARIO OBLIGATORIO */}
       {isRechazarModalOpen && selectedSolicitud && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-60 p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
           <div className="bg-surface-container-lowest rounded-xl border border-surface-container-highest shadow-xl w-full max-w-md p-6 animate-fade-in">
             <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
               <XCircle size={26} />
@@ -699,7 +699,7 @@ const SolicitudesPage = () => {
 
       {/* MODAL ÉXITO ALTA APROBADA: MUESTRA CÓDIGO Y OFRECE IMPRIMIR QR */}
       {altaAprobadaInfo && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-60 p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
           <div className="bg-surface-container-lowest rounded-xl border border-surface-container-highest shadow-xl w-full max-w-md p-6 text-center animate-fade-in">
             <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-4">
               <QrCode size={30} />

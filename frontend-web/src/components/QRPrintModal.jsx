@@ -89,7 +89,7 @@ const QRPrintModal = ({ isOpen, onClose, assetsToPrint }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 animate-fade-in">
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4 animate-fade-in">
       
       {/* Modal Container */}
       <div className="bg-surface-container-lowest rounded-xl shadow-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
