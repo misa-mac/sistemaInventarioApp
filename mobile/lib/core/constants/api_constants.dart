@@ -3,7 +3,7 @@ import 'package:inventario_qr_app/core/storage/session_manager.dart';
 
 class ApiConstants {
   // Configuración del servidor Backend (Node.js/Express)
-  // Host dinámico configurable: Por defecto IP de la PC en Wi-Fi (10.10.3.5)
+  // Host dinámico configurable: Por defecto IP de la PC en la red local (192.168.10.11)
   static String get serverHost => SessionManager.getServerHost();
 
   static String get baseUrl {
@@ -32,4 +32,5 @@ class ApiConstants {
   static const String auditoriasEndpoint = '/auditorias';
   static const String detalleAuditoriaEndpoint = '/auditorias/detalles';
   static const String movimientosEndpoint = '/movimientos';
+  static const String estacionesEndpoint = '/estaciones';
 }

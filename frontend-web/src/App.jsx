@@ -10,8 +10,9 @@ import DashboardPage from './pages/DashboardPage';
 import ConfiguracionPage from './pages/ConfiguracionPage';
 import HistorialPage from './pages/HistorialPage';
 import SolicitudesPage from './pages/SolicitudesPage';
+import EstacionesPage from './pages/EstacionesPage';
 import api from './services/api';
-import { LayoutDashboard, Monitor, LogOut, Settings, Bell, Search, Menu, FileText, Building, Shield, Users, AlertTriangle, Info, Clock, Layers } from 'lucide-react';
+import { LayoutDashboard, Monitor, LogOut, Settings, Bell, Search, Menu, FileText, Building, Shield, Users, AlertTriangle, Info, Clock, Layers, LayoutGrid } from 'lucide-react';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useAuth();
@@ -49,6 +50,7 @@ const Sidebar = () => {
       badge: pendientesCount 
     }] : []),
     { path: '/inventario', icon: <Monitor size={20} />, label: 'Activos Fijos' },
+    { path: '/estaciones', icon: <LayoutGrid size={20} />, label: 'Estaciones de Trabajo' },
     { path: '/ambientes', icon: <Building size={20} />, label: 'Ambientes' },
     { path: '/historial', icon: <Clock size={20} />, label: 'Movimientos' },
     { path: '/reportes', icon: <FileText size={20} />, label: 'Reportes' },
@@ -283,6 +285,16 @@ function AppContent() {
             <ProtectedRoute>
               <DashboardLayout>
                 <InventoryPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/estaciones" 
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <EstacionesPage />
               </DashboardLayout>
             </ProtectedRoute>
           } 

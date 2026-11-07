@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:inventario_qr_app/repositories/auditoria_repository.dart';
 import 'package:inventario_qr_app/models/auditoria_model.dart';
+import 'package:inventario_qr_app/models/estacion_model.dart';
 
 class AuditoriaViewModel extends ChangeNotifier {
   final AuditoriaRepository _auditoriaRepository = AuditoriaRepository();
@@ -14,6 +15,9 @@ class AuditoriaViewModel extends ChangeNotifier {
   List<DetalleAuditoriaModel> _movimientosRecientes = [];
   final Set<String> _activosAuditadosIds = {};
 
+  // Configuración de conteo de estaciones: sumar 4 (por componentes) o 1 (por estación)
+  bool _contarPorComponentes = true;
+
   // Getters
   AuditoriaModel? get auditoriaActual => _auditoriaActual;
   List<DetalleAuditoriaModel> get detalles => _detalles;
@@ -23,6 +27,13 @@ class AuditoriaViewModel extends ChangeNotifier {
   AuditoriaModel? get ultimaAuditoria => _ultimaAuditoria;
   List<DetalleAuditoriaModel> get movimientosRecientes => _movimientosRecientes;
   Set<String> get activosAuditadosIds => _activosAuditadosIds;
+  bool get contarPorComponentes => _contarPorComponentes;
+
+  void setModoConteoEstacion({required bool porComponentes}) {
+    _contarPorComponentes = porComponentes;
+    notifyListeners();
+  }
+
   bool isActivoAuditado(String activoId) => _activosAuditadosIds.contains(activoId);
 
   Future<bool> iniciarAuditoria(
@@ -88,6 +99,51 @@ class AuditoriaViewModel extends ChangeNotifier {
       return false;
     } catch (e) {
       _error = 'Error registrando escaneo: $e';
+      debugPrint('❌ Error: $e');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Registra la estación de trabajo completa auditando todos sus componentes vinculados
+  Future<bool> registrarEstacionCompleta(
+    EstacionModel estacion, {
+    String? observacion,
+  }) async {
+    if (_auditoriaActual == null) return false;
+
+    try {
+      final codigo = estacion.codigoEstacion;
+      debugPrint('🏢 Registrando estación completa: $codigo');
+
+      final resultado = await _auditoriaRepository.registrarDetalleAuditoria(
+        _auditoriaActual!.id,
+        '',
+        'presente',
+        observacion ?? 'Auditoría Estación: $codigo',
+        codigoQr: codigo,
+      );
+
+      if (resultado) {
+        // Marcar IDs de los componentes como auditados
+        for (final comp in estacion.componentes) {
+          _activosAuditadosIds.add(comp.id);
+        }
+        _activosAuditadosIds.add(codigo);
+
+        // Incrementar el contador según configuración: +4 o +1
+        final int incremento = _contarPorComponentes
+            ? (estacion.componentes.isNotEmpty ? estacion.componentes.length : 4)
+            : 1;
+
+        _escaneosCont += incremento;
+        debugPrint('✅ Estación registrada (+ $incremento). Total escaneos: $_escaneosCont');
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _error = 'Error registrando estación: $e';
       debugPrint('❌ Error: $e');
       notifyListeners();
       return false;

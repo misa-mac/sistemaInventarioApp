@@ -3,6 +3,7 @@ const DetalleAuditoria = require('../models/DetalleAuditoria');
 const Ambiente = require('../models/Ambiente');
 const Usuario = require('../models/Usuario');
 const Activo = require('../models/Activo');
+const EstacionTrabajo = require('../models/EstacionTrabajo');
 const { Op } = require('sequelize');
 
 exports.create = async (req, res) => {
@@ -153,6 +154,65 @@ exports.addDetalle = async (req, res) => {
       normEstado = 'presente';
     }
 
+    // Caso QR General de Estación (ej. EST-LAB1-05)
+    if (codigo_qr_escaneado && codigo_qr_escaneado.toString().trim().toUpperCase().startsWith('EST-')) {
+      const estacionCodigo = codigo_qr_escaneado.toString().trim().toUpperCase();
+      const estacion = await EstacionTrabajo.findOne({
+        where: { codigo_estacion: { [Op.iLike]: estacionCodigo } },
+        include: [{ model: Activo, as: 'activos' }]
+      });
+
+      if (estacion && estacion.activos && estacion.activos.length > 0) {
+        const detallesCreados = [];
+        for (const act of estacion.activos) {
+          let det = await DetalleAuditoria.findOne({
+            where: { auditoria_id: id, activo_id: act.id }
+          });
+          const obs = observacion
+            ? `${observacion} (Estación: ${estacion.codigo_estacion})`
+            : `Estación: ${estacion.codigo_estacion}`;
+
+          if (det) {
+            await det.update({
+              estado: normEstado,
+              observacion: obs,
+              fecha_escaneo: fecha_escaneo ? new Date(fecha_escaneo) : new Date()
+            });
+          } else {
+            det = await DetalleAuditoria.create({
+              auditoria_id: id,
+              activo_id: act.id,
+              codigo_qr_escaneado: act.codigo_activo,
+              estado: normEstado,
+              observacion: obs,
+              fecha_escaneo: fecha_escaneo ? new Date(fecha_escaneo) : new Date(),
+              sincronizado: true
+            });
+          }
+          detallesCreados.push(det);
+        }
+
+        // Actualizar contadores de auditoría
+        const encontrados = await DetalleAuditoria.count({ where: { auditoria_id: id, estado: 'presente' } });
+        const faltantes = await DetalleAuditoria.count({ where: { auditoria_id: id, estado: 'faltante' } });
+        const noEsperados = await DetalleAuditoria.count({ where: { auditoria_id: id, estado: 'no_esperado' } });
+        await auditoria.update({
+          total_encontrados: encontrados,
+          total_faltantes: faltantes,
+          total_no_esperados: noEsperados
+        });
+
+        const first = detallesCreados[0].toJSON();
+        return res.status(201).json({
+          ...first,
+          is_station: true,
+          estacion_codigo: estacion.codigo_estacion,
+          componentes_auditados: detallesCreados.length,
+          detalles: detallesCreados
+        });
+      }
+    }
+
     // Si falta codigo_qr_escaneado y tenemos activo_id, buscarlo
     if (!codigo_qr_escaneado && activo_id) {
       const act = await Activo.findByPk(activo_id);
@@ -191,6 +251,16 @@ exports.addDetalle = async (req, res) => {
       observacion: observacion || null,
       fecha_escaneo: fecha_escaneo ? new Date(fecha_escaneo) : new Date(),
       sincronizado: true
+    });
+
+    // Actualizar conteos
+    const encontrados = await DetalleAuditoria.count({ where: { auditoria_id: id, estado: 'presente' } });
+    const faltantes = await DetalleAuditoria.count({ where: { auditoria_id: id, estado: 'faltante' } });
+    const noEsperados = await DetalleAuditoria.count({ where: { auditoria_id: id, estado: 'no_esperado' } });
+    await auditoria.update({
+      total_encontrados: encontrados,
+      total_faltantes: faltantes,
+      total_no_esperados: noEsperados
     });
 
     res.status(201).json(detalle);
@@ -288,6 +358,43 @@ exports.sync = async (req, res) => {
 
       let activoId = item.activo_id;
       let qr = item.codigo_qr_escaneado;
+
+      // Si es un QR de estación en sincronización
+      if (qr && qr.toString().trim().toUpperCase().startsWith('EST-')) {
+        const estCodigo = qr.toString().trim().toUpperCase();
+        const est = await EstacionTrabajo.findOne({
+          where: { codigo_estacion: { [Op.iLike]: estCodigo } },
+          include: [{ model: Activo, as: 'activos' }]
+        });
+        if (est && est.activos && est.activos.length > 0) {
+          for (const act of est.activos) {
+            let yaExiste = await DetalleAuditoria.findOne({
+              where: { auditoria_id: audId, activo_id: act.id }
+            });
+            const obs = item.observacion ? `${item.observacion} (Estación: ${est.codigo_estacion})` : `Estación: ${est.codigo_estacion}`;
+            if (yaExiste) {
+              await yaExiste.update({
+                estado: normEstado,
+                observacion: obs,
+                fecha_escaneo: item.fecha_escaneo ? new Date(item.fecha_escaneo) : new Date()
+              });
+              creados.push(yaExiste);
+            } else {
+              const d = await DetalleAuditoria.create({
+                auditoria_id: audId,
+                activo_id: act.id,
+                codigo_qr_escaneado: act.codigo_activo,
+                estado: normEstado,
+                observacion: obs,
+                fecha_escaneo: item.fecha_escaneo ? new Date(item.fecha_escaneo) : new Date(),
+                sincronizado: true
+              });
+              creados.push(d);
+            }
+          }
+          continue;
+        }
+      }
 
       if (!qr && activoId) {
         const act = await Activo.findByPk(activoId);

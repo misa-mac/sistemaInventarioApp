@@ -70,16 +70,14 @@ CREATE TABLE ambientes (
   CHECK ((latitude IS NULL) = (longitude IS NULL))   -- ambas coordenadas o ninguna
 );
 
--- ---------- 4. ACTIVOS (código XYZAACC-GG) ----------
--- ambiente_id          = ubicación ACTUAL (cambia con los traslados)
--- ambiente_registro_id = ambiente donde se etiquetó (bloque CC del código), no cambia
+-- ---------- 4. ACTIVOS (código real X·CC·TT·AA·NNNN-YY) ----------
+-- ambiente_id = ubicación ACTUAL (el código cambia automáticamente con el traslado)
 CREATE TABLE activos (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  codigo_activo        VARCHAR(20) NOT NULL UNIQUE CHECK (codigo_activo ~ '^[0-9]{7}-[0-9]{2}$'),
-  numero_correlativo   INTEGER     NOT NULL CHECK (numero_correlativo BETWEEN 1 AND 99),
+  codigo_activo        VARCHAR(25) NOT NULL CHECK (codigo_activo ~ '^1[0-9]{2}[0-9]{2}[0-9]{2}[0-9]{1,4}-[0-9]{2}$'),
+  numero_correlativo   INTEGER     NOT NULL CHECK (numero_correlativo BETWEEN 1 AND 9999),
   tipo_activo_id       UUID        NOT NULL REFERENCES tipo_activos(id),
   ambiente_id          UUID        NOT NULL REFERENCES ambientes(id),
-  ambiente_registro_id UUID        NOT NULL REFERENCES ambientes(id),
   nombre               VARCHAR(150) NOT NULL,   -- si no se envía, el trigger lo arma (tipo + código)
   marca                VARCHAR(100),
   modelo               VARCHAR(100),
@@ -94,49 +92,53 @@ CREATE TABLE activos (
   estado               estado_activo NOT NULL DEFAULT 'Activo',
   observaciones        TEXT,
   created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (tipo_activo_id, ambiente_registro_id, numero_correlativo)
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Genera el código XYZAACC-GG si no se envía (X=1 fijo, YZ=año, AA=tipo, CC=ambiente, GG=correlativo).
+CREATE UNIQUE INDEX activos_codigo_activo_uidx 
+  ON activos (codigo_activo) 
+  WHERE estado <> 'Inactivo';
+
+CREATE UNIQUE INDEX activos_tipo_ambiente_correlativo_uidx 
+  ON activos (tipo_activo_id, ambiente_id, numero_correlativo) 
+  WHERE estado <> 'Inactivo';
+
+-- Genera el código real X·CC·TT·AA·NNNN-YY (X=1 fijo, CC=50 carrera, TT=tipo, AA=ambiente, NNNN=correlativo 1-4 dígitos sin ceros, YY=año).
 CREATE FUNCTION fn_activos_asignar_codigo() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
+  v_tt INTEGER;
   v_aa INTEGER;
-  v_cc INTEGER;
+  v_yy TEXT;
 BEGIN
-  IF NEW.ambiente_registro_id IS NULL THEN
-    NEW.ambiente_registro_id := NEW.ambiente_id;
+  SELECT codigo INTO v_tt FROM tipo_activos WHERE id = NEW.tipo_activo_id;
+  SELECT codigo INTO v_aa FROM ambientes    WHERE id = NEW.ambiente_id;
+  IF v_tt IS NULL OR v_aa IS NULL THEN
+    RAISE EXCEPTION 'Tipo de activo o ambiente inexistente';
   END IF;
 
-  IF NEW.codigo_activo IS NULL THEN
-    SELECT codigo INTO v_aa FROM tipo_activos WHERE id = NEW.tipo_activo_id;
-    SELECT codigo INTO v_cc FROM ambientes    WHERE id = NEW.ambiente_registro_id;
-    IF v_aa IS NULL OR v_cc IS NULL THEN
-      RAISE EXCEPTION 'Tipo de activo o ambiente de registro inexistente';
-    END IF;
+  -- Bloqueo consultivo de transacción para evitar duplicados concurrentes en la misma carrera+tipo+ambiente
+  PERFORM pg_advisory_xact_lock(
+    hashtextextended('50' || NEW.tipo_activo_id::text || NEW.ambiente_id::text, 0));
 
-    -- Evita correlativos duplicados con altas simultáneas.
-    PERFORM pg_advisory_xact_lock(
-      hashtextextended(NEW.tipo_activo_id::text || NEW.ambiente_registro_id::text, 0));
-
-    IF NEW.numero_correlativo IS NULL THEN
-      SELECT COALESCE(MAX(numero_correlativo), 0) + 1
-        INTO NEW.numero_correlativo
-        FROM activos
-       WHERE tipo_activo_id = NEW.tipo_activo_id
-         AND ambiente_registro_id = NEW.ambiente_registro_id;
-    END IF;
-
-    IF NEW.numero_correlativo > 99 THEN
-      RAISE EXCEPTION 'Se agotó el correlativo (máx. 99) para este tipo en este ambiente';
-    END IF;
-
-    NEW.codigo_activo := '1'
-      || to_char(COALESCE(NEW.fecha_ingreso, CURRENT_DATE), 'YY')
-      || lpad(v_aa::text, 2, '0')
-      || lpad(v_cc::text, 2, '0')
-      || '-' || lpad(NEW.numero_correlativo::text, 2, '0');
+  IF NEW.numero_correlativo IS NULL THEN
+    SELECT COALESCE(MAX(numero_correlativo), 0) + 1
+      INTO NEW.numero_correlativo
+      FROM activos
+     WHERE tipo_activo_id = NEW.tipo_activo_id
+       AND ambiente_id = NEW.ambiente_id
+       AND estado <> 'Inactivo';
   END IF;
+
+  IF NEW.numero_correlativo > 9999 OR NEW.numero_correlativo < 1 THEN
+    RAISE EXCEPTION 'El correlativo debe estar entre 1 y 9999 para este tipo en este ambiente';
+  END IF;
+
+  v_yy := to_char(COALESCE(NEW.fecha_ingreso, CURRENT_DATE), 'YY');
+  NEW.codigo_activo := '150'
+    || lpad(v_tt::text, 2, '0')
+    || lpad(v_aa::text, 2, '0')
+    || NEW.numero_correlativo::text
+    || '-' || v_yy;
 
   IF NEW.nombre IS NULL OR btrim(NEW.nombre) = '' THEN
     NEW.nombre := COALESCE((SELECT nombre FROM tipo_activos WHERE id = NEW.tipo_activo_id), 'Activo')
@@ -145,15 +147,73 @@ BEGIN
   RETURN NEW;
 END $$;
 
--- La identidad del activo (lo que está impreso en el QR) no puede cambiar.
+-- Control de inmutabilidad y cálculo automático en traslados de ambiente
 CREATE FUNCTION fn_activos_identidad_inmutable() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  v_tt INTEGER;
+  v_aa INTEGER;
+  v_yy TEXT;
+  v_colision BOOLEAN;
 BEGIN
-  IF NEW.codigo_activo        IS DISTINCT FROM OLD.codigo_activo
-  OR NEW.numero_correlativo   IS DISTINCT FROM OLD.numero_correlativo
-  OR NEW.tipo_activo_id       IS DISTINCT FROM OLD.tipo_activo_id
-  OR NEW.ambiente_registro_id IS DISTINCT FROM OLD.ambiente_registro_id THEN
-    RAISE EXCEPTION 'La identidad del activo (código, tipo y ambiente de registro) es inmutable';
+  -- Caso traslado de ambiente (UPDATE de ambiente_id)
+  IF NEW.ambiente_id IS DISTINCT FROM OLD.ambiente_id THEN
+    SELECT codigo INTO v_tt FROM tipo_activos WHERE id = NEW.tipo_activo_id;
+    SELECT codigo INTO v_aa FROM ambientes    WHERE id = NEW.ambiente_id;
+    IF v_tt IS NULL OR v_aa IS NULL THEN
+      RAISE EXCEPTION 'Tipo de activo o ambiente destino inexistente';
+    END IF;
+
+    -- Bloqueo consultivo en el ambiente destino
+    PERFORM pg_advisory_xact_lock(
+      hashtextextended('50' || NEW.tipo_activo_id::text || NEW.ambiente_id::text, 0));
+
+    -- Regla de traslado: Si el correlativo actual no existe en el destino, puede conservarlo;
+    -- si ya existe (colisión), toma el siguiente al máximo del destino.
+    SELECT EXISTS (
+      SELECT 1 FROM activos
+       WHERE ambiente_id = NEW.ambiente_id
+         AND tipo_activo_id = NEW.tipo_activo_id
+         AND numero_correlativo = OLD.numero_correlativo
+         AND estado <> 'Inactivo'
+         AND id <> OLD.id
+    ) INTO v_colision;
+
+    IF NOT v_colision THEN
+      NEW.numero_correlativo := OLD.numero_correlativo;
+    ELSE
+      SELECT COALESCE(MAX(numero_correlativo), 0) + 1
+        INTO NEW.numero_correlativo
+        FROM activos
+       WHERE ambiente_id = NEW.ambiente_id
+         AND tipo_activo_id = NEW.tipo_activo_id
+         AND estado <> 'Inactivo'
+         AND id <> OLD.id;
+    END IF;
+
+    IF NEW.numero_correlativo > 9999 OR NEW.numero_correlativo < 1 THEN
+      RAISE EXCEPTION 'El correlativo debe estar entre 1 y 9999 en el ambiente de destino';
+    END IF;
+
+    v_yy := to_char(COALESCE(NEW.fecha_ingreso, OLD.fecha_ingreso, CURRENT_DATE), 'YY');
+    NEW.codigo_activo := '150'
+      || lpad(v_tt::text, 2, '0')
+      || lpad(v_aa::text, 2, '0')
+      || NEW.numero_correlativo::text
+      || '-' || v_yy;
+
+  ELSE
+    -- Si no hubo cambio de ambiente, el cliente no puede alterar codigo_activo ni numero_correlativo
+    IF NEW.codigo_activo IS DISTINCT FROM OLD.codigo_activo
+    OR NEW.numero_correlativo IS DISTINCT FROM OLD.numero_correlativo THEN
+      RAISE EXCEPTION 'La identidad del activo (código y correlativo) solo puede cambiar automáticamente en traslados de ambiente';
+    END IF;
   END IF;
+
+  -- El tipo de activo es inmutable
+  IF NEW.tipo_activo_id IS DISTINCT FROM OLD.tipo_activo_id THEN
+    RAISE EXCEPTION 'El tipo de activo es inmutable';
+  END IF;
+
   RETURN NEW;
 END $$;
 

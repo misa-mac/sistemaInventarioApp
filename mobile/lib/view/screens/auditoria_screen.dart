@@ -5,6 +5,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:vibration/vibration.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:inventario_qr_app/core/theme/app_theme.dart';
+import 'package:inventario_qr_app/repositories/estacion_repository.dart';
 import 'package:inventario_qr_app/viewmodel/auditoria_viewmodel.dart';
 import 'package:inventario_qr_app/viewmodel/ambiente_viewmodel.dart';
 import 'package:inventario_qr_app/viewmodel/auth_viewmodel.dart';
@@ -192,6 +193,56 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
     _ultimoCodigoEscaneado = cleanCode;
     _ultimoEscaneoTime = now;
 
+    // Caso QR General de Estación (EST-...)
+    if (cleanCode.toUpperCase().startsWith('EST-')) {
+      try {
+        final estacionRepo = EstacionRepository();
+        final estacion = await estacionRepo.getEstacionPorCodigo(cleanCode);
+
+        if (estacion != null) {
+          final success = await auditoriaVM.registrarEstacionCompleta(estacion);
+          if (success) {
+            _codigosAuditados.add(cleanCode);
+            for (final c in estacion.componentes) {
+              _codigosAuditados.add(c.qrCodigo);
+            }
+
+            if (mounted) {
+              setState(() => _scanFlash = true);
+            }
+            try { await Vibration.vibrate(duration: 70); } catch (_) {}
+            _reproducirSonido();
+
+            Future.delayed(const Duration(milliseconds: 350), () {
+              if (mounted) setState(() => _scanFlash = false);
+            });
+
+            final int inc = auditoriaVM.contarPorComponentes
+                ? (estacion.componentes.isNotEmpty ? estacion.componentes.length : 4)
+                : 1;
+
+            if (mounted) {
+              _iniciarCooldown(
+                durationMs: _cooldownDurationMs,
+                mensaje: '✓ Estación $cleanCode registrada (+ $inc equipos)',
+                color: AppColors.statusGreen,
+              );
+            }
+            return;
+          }
+        } else {
+          if (mounted) {
+            _mostrarModalNoEsperado(context, cleanCode, auditoriaVM);
+          }
+          return;
+        }
+      } catch (e) {
+        debugPrint('Error procesando QR de estación: $e');
+        if (mounted) _iniciarCooldown(durationMs: 1500);
+        return;
+      }
+    }
+
     try {
       final activoVM = context.read<ActivoViewModel>();
 
@@ -261,6 +312,60 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
         _iniciarCooldown(durationMs: 1200);
       }
     }
+  }
+
+  void _mostrarConfiguracionConteoEstacion(BuildContext context, AuditoriaViewModel vm) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Conteo de Estaciones',
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Seleccione cómo debe registrar el contador al escanear un código general de estación (EST-...):',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 14),
+            RadioListTile<bool>(
+              contentPadding: EdgeInsets.zero,
+              activeColor: AppColors.primaryNavy,
+              title: const Text('Sumar 4 componentes (Recomendado)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: const Text('Contabiliza individualmente CPU, Monitor, Teclado y Mouse.', style: TextStyle(fontSize: 11)),
+              value: true,
+              groupValue: vm.contarPorComponentes,
+              onChanged: (val) {
+                if (val != null) vm.setModoConteoEstacion(porComponentes: val);
+                Navigator.pop(ctx);
+              },
+            ),
+            RadioListTile<bool>(
+              contentPadding: EdgeInsets.zero,
+              activeColor: AppColors.primaryNavy,
+              title: const Text('Sumar 1 estación (Mesa)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: const Text('Contabiliza la estación completa como una sola unidad.', style: TextStyle(fontSize: 11)),
+              value: false,
+              groupValue: vm.contarPorComponentes,
+              onChanged: (val) {
+                if (val != null) vm.setModoConteoEstacion(porComponentes: val);
+                Navigator.pop(ctx);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _mostrarModalNoEsperado(
@@ -512,6 +617,21 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
             ),
           ),
           actions: [
+            // Configuración de conteo de estaciones (+1 o +4)
+            Consumer<AuditoriaViewModel>(
+              builder: (context, vm, _) {
+                return IconButton(
+                  icon: Icon(
+                    vm.contarPorComponentes ? Icons.pin_drop : Icons.table_restaurant,
+                    color: Colors.white,
+                  ),
+                  tooltip: vm.contarPorComponentes
+                      ? 'Modo Estación: Suma 4 componentes (Toca para cambiar)'
+                      : 'Modo Estación: Suma 1 mesa (Toca para cambiar)',
+                  onPressed: () => _mostrarConfiguracionConteoEstacion(context, vm),
+                );
+              },
+            ),
             // Control de linterna en el AppBar
             ValueListenableBuilder<TorchState>(
               valueListenable: _cameraController.torchState,
@@ -583,45 +703,61 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          // Chip de Geofence (dentro o fuera)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: dentroGeofence
-                                  ? AppColors.statusGreenBg
-                                  : AppColors.statusAmberBg,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: dentroGeofence
-                                    ? AppColors.statusGreen.withValues(alpha: 0.4)
-                                    : AppColors.statusAmber.withValues(alpha: 0.4),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  dentroGeofence
-                                      ? Icons.check_circle_rounded
-                                      : Icons.location_off_rounded,
-                                  size: 14,
-                                  color: dentroGeofence
-                                      ? AppColors.statusGreenText
-                                      : AppColors.statusAmberText,
+                          // Chip de Geofence interactivo (con mensaje detallado al pulsar)
+                          InkWell(
+                            onTap: () {
+                              final msg = ambienteVM.mensajeUbicacion ??
+                                  (dentroGeofence
+                                      ? 'Ubicación verificada dentro de ${ambiente?.nombre ?? "el ambiente"}'
+                                      : 'Fuera del rango permitido para ${ambiente?.nombre ?? "el ambiente"}');
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(msg),
+                                  backgroundColor: dentroGeofence ? Colors.green[800] : Colors.orange[900],
+                                  duration: const Duration(seconds: 4),
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  dentroGeofence ? 'Dentro de rango' : 'Fuera de rango',
-                                  style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: dentroGeofence
+                                    ? AppColors.statusGreenBg
+                                    : AppColors.statusAmberBg,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: dentroGeofence
+                                      ? AppColors.statusGreen.withValues(alpha: 0.4)
+                                      : AppColors.statusAmber.withValues(alpha: 0.4),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    dentroGeofence
+                                        ? Icons.check_circle_rounded
+                                        : Icons.location_off_rounded,
+                                    size: 14,
                                     color: dentroGeofence
                                         ? AppColors.statusGreenText
                                         : AppColors.statusAmberText,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    dentroGeofence ? 'Dentro de rango' : 'Fuera de rango',
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: dentroGeofence
+                                          ? AppColors.statusGreenText
+                                          : AppColors.statusAmberText,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],

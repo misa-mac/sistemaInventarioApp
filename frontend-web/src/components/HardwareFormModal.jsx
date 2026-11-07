@@ -11,7 +11,6 @@ const HardwareFormModal = ({ isOpen, onClose, onSuccess, editData }) => {
     numero_serie: '',
     tipo_activo_id: '',
     ambiente_id: '',
-    ambiente_registro_id: '',
     origen: '',
     especificacion_origen: '',
     descripcion: '',
@@ -46,7 +45,6 @@ const HardwareFormModal = ({ isOpen, onClose, onSuccess, editData }) => {
           numero_serie: editData.numero_serie || '',
           tipo_activo_id: editData.tipo_activo_id || '',
           ambiente_id: editData.ambiente_id || '',
-          ambiente_registro_id: editData.ambiente_registro_id || editData.ambiente_id || '',
           origen: editData.origen || '',
           especificacion_origen: editData.especificacion_origen || '',
           descripcion: editData.descripcion || '',
@@ -70,7 +68,6 @@ const HardwareFormModal = ({ isOpen, onClose, onSuccess, editData }) => {
           numero_serie: '',
           tipo_activo_id: '',
           ambiente_id: '',
-          ambiente_registro_id: '',
           origen: '',
           especificacion_origen: '',
           descripcion: '',
@@ -103,7 +100,7 @@ const HardwareFormModal = ({ isOpen, onClose, onSuccess, editData }) => {
     if (editData) {
       setPreviewCodigo(editData.codigo_activo);
     } else {
-      setPreviewCodigo('Asignado por base de datos (1YYAACC-GG)');
+      setPreviewCodigo('Asignado por BD (formato 150TTAANNNN-YY)');
     }
   }, [editData]);
 
@@ -154,16 +151,27 @@ const HardwareFormModal = ({ isOpen, onClose, onSuccess, editData }) => {
     }
 
     try {
+      let savedAsset = null;
+      let huboCambioAmbiente = false;
+
       if (editData) {
-        await api.put(`/inventory/${editData.id}`, submitData, {
+        if (editData.ambiente_id && formData.ambiente_id && editData.ambiente_id !== formData.ambiente_id) {
+          huboCambioAmbiente = true;
+        }
+        const res = await api.put(`/inventory/${editData.id}`, submitData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
+        savedAsset = res.data;
+        if (res.data?.hubo_cambio_ambiente) {
+          huboCambioAmbiente = true;
+        }
       } else {
-        await api.post('/inventory', submitData, {
+        const res = await api.post('/inventory', submitData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
+        savedAsset = res.data;
       }
-      onSuccess();
+      onSuccess(savedAsset, { huboCambioAmbiente });
       onClose();
     } catch (err) {
       setError(err.response?.data?.error || err.response?.data?.message || 'Error al guardar el activo.');
@@ -185,7 +193,7 @@ const HardwareFormModal = ({ isOpen, onClose, onSuccess, editData }) => {
               {editData ? 'Editar Activo Fijo' : 'Registrar Nuevo Activo'}
             </h2>
             <p className="text-xs text-on-surface-variant mt-0.5">
-              Esquema unificado con código de barras/QR (1YYAACC-GG) y trazabilidad completa
+              Formato institucional oficial (150·TT·AA·NNNN-YY) y trazabilidad completa
             </p>
           </div>
           <button 

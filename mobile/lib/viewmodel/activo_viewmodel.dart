@@ -8,6 +8,7 @@ class ActivoViewModel extends ChangeNotifier {
   final QrService _qrService = QrService();
 
   List<ActivoModel> _activos = [];
+  List<ActivoModel> _todosLosActivos = [];
   ActivoModel? _activoActual;
   bool _isLoading = false;
   String? _error;
@@ -17,12 +18,22 @@ class ActivoViewModel extends ChangeNotifier {
 
   // Getters
   List<ActivoModel> get activos => _activos;
+  List<ActivoModel> get todosLosActivos => _todosLosActivos;
   ActivoModel? get activoActual => _activoActual;
   bool get isLoading => _isLoading;
   String? get error => _error;
   ActivoModel? get ultimoEscaneado => _ultimoEscaneado;
   List<ActivoModel> get activosNuevos => _activosNuevos;
   List<ActivoModel> get activosDeBaja => _activosDeBaja;
+
+  Future<void> cargarTodosLosActivos() async {
+    try {
+      _todosLosActivos = await _activoRepository.getTodosLosActivos();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error cargando todos los activos: $e');
+    }
+  }
 
   Future<void> cargarActivosPorAmbiente(String ambienteId) async {
     _isLoading = true;

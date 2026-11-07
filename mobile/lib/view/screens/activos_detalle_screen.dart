@@ -483,17 +483,21 @@ class _ActivosDetalleScreenState extends State<ActivosDetalleScreen> {
                   ),
                 ),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Ficha Técnica Completa',
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                    const Expanded(
+                      child: Text(
+                        'Ficha Técnica Completa',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     _buildEstadoChip(activo.estado),
                   ],
                 ),
@@ -503,7 +507,19 @@ class _ActivosDetalleScreenState extends State<ActivosDetalleScreen> {
                 _buildDetalleItem('Marca', activo.marca),
                 _buildDetalleItem('Modelo', activo.modelo),
                 _buildDetalleItem('Número de Serie', activo.numeroSerie),
-                _buildDetalleItem('Ambiente Actual', ambienteNombre),
+                _buildDetalleItem('Ambiente Actual', activo.ambienteNombre ?? ambienteNombre),
+                if (activo.ambienteUbicacion != null && activo.ambienteUbicacion!.isNotEmpty)
+                  _buildDetalleItem('Ubicación Física', activo.ambienteUbicacion!),
+                if (activo.responsable != null && activo.responsable!.isNotEmpty)
+                  _buildDetalleItem('Responsable', activo.responsable!),
+                if (activo.origen != null && activo.origen!.isNotEmpty)
+                  _buildDetalleItem('Origen', activo.especificacionOrigen != null && activo.especificacionOrigen!.isNotEmpty ? '${activo.origen!} (${activo.especificacionOrigen!})' : activo.origen!),
+                if (activo.fechaIngreso != null && activo.fechaIngreso!.isNotEmpty)
+                  _buildDetalleItem('Fecha de Ingreso', activo.fechaIngreso!),
+                if (activo.valor != null)
+                  _buildDetalleItem('Valor Estimado', 'Bs. ${activo.valor!.toStringAsFixed(2)}'),
+                if (activo.descripcion != null && activo.descripcion!.isNotEmpty)
+                  _buildDetalleItem('Descripción', activo.descripcion!),
                 _buildDetalleItem('Código QR', activo.qrCodigo),
                 _buildDetalleItem('UUID del Sistema', activo.uuid),
                 if (activo.observaciones != null && activo.observaciones!.isNotEmpty) ...[

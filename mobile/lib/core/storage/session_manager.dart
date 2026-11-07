@@ -15,7 +15,7 @@ import 'package:inventario_qr_app/models/usuario_model.dart';
 class SessionManager {
   static const String _fileName = 'session.json';
 
-  static const String defaultServerHost = '10.10.3.5';
+  static const String defaultServerHost = '192.168.10.11';
   static String? _cachedServerHost;
   static String? _cachedToken;
   static UsuarioModel? _cachedUsuario;

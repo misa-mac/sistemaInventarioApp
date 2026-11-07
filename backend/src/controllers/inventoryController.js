@@ -69,7 +69,7 @@ const updateSchema = Joi.object({
 
 exports.getAll = async (req, res) => {
   try {
-    const { ambiente_id, estado, limit } = req.query;
+    const { ambiente_id, estado, limit, q } = req.query;
     const where = {};
 
     if (ambiente_id && isUuid(ambiente_id)) where.ambiente_id = ambiente_id;
@@ -77,11 +77,23 @@ exports.getAll = async (req, res) => {
       where.estado = normalizeEstado(estado);
     }
 
+    if (q && q.trim()) {
+      const qStr = `%${q.trim()}%`;
+      where[Op.or] = [
+        { nombre: { [Op.like]: qStr } },
+        { codigo_activo: { [Op.like]: qStr } },
+        { qr_codigo: { [Op.like]: qStr } },
+        { numero_serie: { [Op.like]: qStr } },
+        { modelo: { [Op.like]: qStr } },
+        { marca: { [Op.like]: qStr } },
+        ...(isUuid(q.trim()) ? [{ id: q.trim() }] : [])
+      ];
+    }
+
     const activos = await Activo.findAll({
       where,
       include: [
         { model: Ambiente, as: 'ambiente', attributes: ['id', 'nombre', 'codigo', 'ubicacion'] },
-        { model: Ambiente, as: 'ambiente_registro', attributes: ['id', 'nombre', 'codigo', 'ubicacion'] },
         { model: TipoActivo, as: 'tipo', attributes: ['id', 'nombre', 'codigo'] }
       ],
       order: [['created_at', 'DESC']],
@@ -119,7 +131,6 @@ exports.getBySearch = async (req, res) => {
       },
       include: [
         { model: Ambiente, as: 'ambiente' },
-        { model: Ambiente, as: 'ambiente_registro' },
         { model: TipoActivo, as: 'tipo' }
       ]
     });
@@ -164,7 +175,6 @@ exports.getById = async (req, res) => {
       activo = await Activo.findByPk(id, {
         include: [
           { model: Ambiente, as: 'ambiente' },
-          { model: Ambiente, as: 'ambiente_registro' },
           { model: TipoActivo, as: 'tipo' }
         ]
       });
@@ -178,7 +188,6 @@ exports.getById = async (req, res) => {
         },
         include: [
           { model: Ambiente, as: 'ambiente' },
-          { model: Ambiente, as: 'ambiente_registro' },
           { model: TipoActivo, as: 'tipo' }
         ]
       });
@@ -198,14 +207,12 @@ exports.getById = async (req, res) => {
 exports.getNextSequence = async (req, res) => {
   try {
     const { tipo_activo_id, ambiente_id } = req.query;
-    let whereClause = {};
+    let whereClause = {
+      estado: { [Op.ne]: 'Inactivo' }
+    };
 
-    if (tipo_activo_id && ambiente_id) {
-      whereClause = {
-        tipo_activo_id,
-        ambiente_registro_id: ambiente_id
-      };
-    }
+    if (tipo_activo_id) whereClause.tipo_activo_id = tipo_activo_id;
+    if (ambiente_id) whereClause.ambiente_id = ambiente_id;
 
     const maxCorrelativo = await Activo.max('numero_correlativo', { where: whereClause }) || 0;
     res.json({ next: maxCorrelativo + 1 });
@@ -249,15 +256,13 @@ exports.create = async (req, res) => {
   try {
     const tipo = await TipoActivo.findByPk(value.tipo_activo_id);
     const ambienteActual = await Ambiente.findByPk(value.ambiente_id);
-    const ambienteRegistroId = value.ambiente_registro_id || value.ambiente_id;
-    const ambienteRegistro = await Ambiente.findByPk(ambienteRegistroId);
     
-    if (!tipo || !ambienteActual || !ambienteRegistro) {
+    if (!tipo || !ambienteActual) {
       await t.rollback();
       return res.status(400).json({ message: 'Tipo de activo o ambiente inválido' });
     }
 
-    value.ambiente_registro_id = ambienteRegistroId;
+    delete value.ambiente_registro_id;
     
     // Dejar que la base de datos (trigger fn_activos_asignar_codigo) sea la ÚNICA fuente de verdad para el código y correlativo
     delete value.codigo_activo;
@@ -276,7 +281,6 @@ exports.create = async (req, res) => {
     await activo.reload({
       include: [
         { model: Ambiente, as: 'ambiente', attributes: ['id', 'nombre', 'codigo', 'ubicacion'] },
-        { model: Ambiente, as: 'ambiente_registro', attributes: ['id', 'nombre', 'codigo', 'ubicacion'] },
         { model: TipoActivo, as: 'tipo', attributes: ['id', 'nombre', 'codigo'] }
       ]
     });
@@ -307,12 +311,24 @@ exports.update = async (req, res) => {
 
     if (!activo) return res.status(404).json({ message: 'Activo no encontrado' });
     
-    // Campos inmutables en edición (cambiar de ambiente es traslado, no edición)
+    // Campos inmutables (identidad física permanente del activo)
     delete value.codigo_activo;
     delete value.numero_correlativo;
     delete value.tipo_activo_id;
     delete value.ambiente_registro_id;
-    delete value.ambiente_id;
+
+    let huboCambioAmbiente = false;
+    let ambienteAnteriorId = activo.ambiente_id;
+    let codigoAnterior = activo.codigo_activo;
+    let nuevoAmbiente = null;
+
+    if (value.ambiente_id && value.ambiente_id !== activo.ambiente_id) {
+      nuevoAmbiente = await Ambiente.findByPk(value.ambiente_id);
+      if (!nuevoAmbiente) {
+        return res.status(400).json({ message: 'El ambiente seleccionado no existe.' });
+      }
+      huboCambioAmbiente = true;
+    }
 
     if (req.file) {
       value.imagen_url = `/uploads/activos/${req.file.filename}`;
@@ -322,8 +338,34 @@ exports.update = async (req, res) => {
     
     await activo.update(value);
 
+    // Recargar para obtener el codigo_activo y numero_correlativo calculados por el trigger de BD
+    await activo.reload({
+      include: [
+        { model: Ambiente, as: 'ambiente', attributes: ['id', 'nombre', 'codigo', 'ubicacion'] },
+        { model: TipoActivo, as: 'tipo', attributes: ['id', 'nombre', 'codigo'] }
+      ]
+    });
+
+    // Si hubo traslado de ambiente, registrar el movimiento oficial con el cambio de código
+    if (huboCambioAmbiente) {
+      await Movimiento.create({
+        tipo_evento: 'traslado',
+        activo_id: activo.id,
+        usuario_id: req.user.id,
+        ambiente_origen_id: ambienteAnteriorId,
+        ambiente_destino_id: value.ambiente_id,
+        estado_anterior: activo.estado,
+        estado_nuevo: value.estado || activo.estado,
+        tipo_mantenimiento: null,
+        piezas_reemplazadas: null,
+        costo_mantenimiento: null,
+        observaciones: `Traslado a ${nuevoAmbiente.nombre}. Código QR actualizado de ${codigoAnterior} a ${activo.codigo_activo}`
+      });
+    }
+
     const plain = activo.toJSON();
     plain.imagen = plain.imagen_url;
+    plain.hubo_cambio_ambiente = huboCambioAmbiente;
     res.json(plain);
   } catch (error) {
     console.error(error);
@@ -333,14 +375,83 @@ exports.update = async (req, res) => {
 
 exports.delete = async (req, res) => {
   const { id } = req.params;
+  const esPermanente = req.query.permanente === 'true' || req.body?.permanente === true;
+
   try {
     const activo = isUuid(id)
       ? await Activo.findByPk(id)
       : await Activo.findOne({ where: { codigo_activo: id } });
 
     if (!activo) return res.status(404).json({ message: 'Activo no encontrado' });
-    
-    // Regla: Solo baja lógica, sin borrado físico para ningún rol
+
+    // Si ya está inactivo (previamente dado de baja) o se solicita eliminación definitiva:
+    if (activo.estado === 'Inactivo' || esPermanente) {
+      const t = await sequelize.transaction();
+      try {
+        const DetalleAuditoria = require('../models/DetalleAuditoria');
+        const SolicitudCambio = require('../models/SolicitudCambio');
+        const AuditLog = require('../models/AuditLog');
+        const fs = require('fs');
+        const path = require('path');
+
+        // 1. Limpiar referencias en detalle_auditoria
+        await DetalleAuditoria.destroy({ where: { activo_id: activo.id }, transaction: t });
+
+        // 2. Limpiar referencias en movimientos
+        await Movimiento.destroy({ where: { activo_id: activo.id }, transaction: t });
+
+        // 3. Limpiar referencias en solicitudes_cambio (tanto como activo afectado como resultante)
+        await SolicitudCambio.destroy({
+          where: {
+            [Op.or]: [
+              { activo_id: activo.id },
+              { activo_resultante_id: activo.id }
+            ]
+          },
+          transaction: t
+        });
+
+        // 4. Limpiar imagen física del servidor si existe
+        if (activo.imagen_url && activo.imagen_url.startsWith('/uploads/')) {
+          const fullImgPath = path.join(__dirname, '../../', activo.imagen_url);
+          if (fs.existsSync(fullImgPath)) {
+            try { fs.unlinkSync(fullImgPath); } catch (_) {}
+          }
+        }
+
+        // 5. Registrar en audit_logs antes de eliminar
+        try {
+          await AuditLog.create({
+            usuario_id: req.user?.id || null,
+            accion: 'ACTIVO_ELIMINADO_DEFINITIVO',
+            recurso: '/api/inventory',
+            recurso_id: activo.id,
+            resultado: 'exitoso',
+            detalles: `Activo ${activo.codigo_activo} (${activo.nombre}) eliminado definitivamente por ${req.user?.email || 'admin'}`,
+            ip_address: req.ip || req.connection?.remoteAddress || '127.0.0.1',
+            user_agent: req.get('User-Agent') || 'Desconocido',
+            fecha_hora: new Date()
+          }, { transaction: t });
+        } catch (logErr) {
+          console.warn('Advertencia audit_logs:', logErr.message);
+        }
+
+        // 6. Eliminar definitivamente el activo
+        await activo.destroy({ transaction: t });
+
+        await t.commit();
+        return res.json({ 
+          message: 'Activo eliminado definitivamente de la base de datos', 
+          id: activo.id, 
+          eliminado_permanente: true 
+        });
+      } catch (transErr) {
+        await t.rollback();
+        throw transErr;
+      }
+    }
+
+    // Si aún estaba Activo y no se pidió permanente: Baja lógica
     const estadoAnterior = activo.estado;
     await activo.update({ estado: 'Inactivo' });
 
@@ -359,10 +470,10 @@ exports.delete = async (req, res) => {
       observaciones: req.body?.observaciones || 'Baja lógica de activo'
     });
 
-    res.json({ message: 'Activo dado de baja correctamente (baja lógica)', activo });
+    res.json({ message: 'Activo dado de baja correctamente (baja lógica)', activo, eliminado_permanente: false });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error al dar de baja el activo: ' + error.message });
+    console.error('Error al procesar eliminación:', error);
+    res.status(500).json({ message: 'Error al dar de baja o eliminar el activo: ' + error.message });
   }
 };
 
@@ -434,7 +545,6 @@ exports.bulkImport = async (req, res) => {
         nombre: (raw.nombre && raw.nombre.toString().trim()) || `${tipo ? tipo.nombre : 'Activo'} ${raw.marca || ''}`.trim(),
         tipo_activo_id: tipo ? tipo.id : null,
         ambiente_id: amb.id,
-        ambiente_registro_id: amb.id,
         marca: raw.marca ? raw.marca.toString().trim() : null,
         modelo: raw.modelo ? raw.modelo.toString().trim() : null,
         numero_serie: raw.numero_serie ? raw.numero_serie.toString().trim() : null,

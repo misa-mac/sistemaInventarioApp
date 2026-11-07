@@ -6,6 +6,7 @@ import 'package:vibration/vibration.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:inventario_qr_app/viewmodel/auditoria_viewmodel.dart';
 import 'package:inventario_qr_app/viewmodel/activo_viewmodel.dart';
+import 'package:inventario_qr_app/repositories/estacion_repository.dart';
 
 class QrScanOptimizadoScreen extends StatefulWidget {
   const QrScanOptimizadoScreen({super.key});
@@ -299,6 +300,45 @@ class _QrScanOptimizadoScreenState extends State<QrScanOptimizadoScreen> {
     _isProcessing = true;
     _ultimoCodigoEscaneado = cleanCode;
     _ultimoEscaneoTime = now;
+
+    // Caso QR General de Estación (EST-...)
+    if (cleanCode.toUpperCase().startsWith('EST-')) {
+      try {
+        final estacionRepo = EstacionRepository();
+        final estacion = await estacionRepo.getEstacionPorCodigo(cleanCode);
+
+        if (estacion != null) {
+          final success = await auditoriaVM.registrarEstacionCompleta(estacion);
+          if (success) {
+            _codigosAuditados.add(cleanCode);
+            for (final c in estacion.componentes) {
+              _codigosAuditados.add(c.qrCodigo);
+            }
+
+            await _reproducirSonidoExito();
+            try { await Vibration.vibrate(duration: 70); } catch (_) {}
+
+            final int inc = auditoriaVM.contarPorComponentes
+                ? (estacion.componentes.isNotEmpty ? estacion.componentes.length : 4)
+                : 1;
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('✓ Estación $cleanCode auditada (+ $inc equipos)'),
+                  backgroundColor: Colors.green[800],
+                  duration: const Duration(milliseconds: 1800),
+                ),
+              );
+              _iniciarCooldown(durationMs: _cooldownDurationMs);
+            }
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint('Error procesando estación en escaneo rápido: $e');
+      }
+    }
 
     try {
       final activoVM = context.read<ActivoViewModel>();

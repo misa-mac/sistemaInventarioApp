@@ -102,7 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       controller: serverController,
                       decoration: const InputDecoration(
                         labelText: 'IP o Host del Servidor',
-                        hintText: '10.10.3.5',
+                        hintText: '192.168.10.11',
                         prefixIcon: Icon(Icons.dns_outlined, color: AppColors.brandBlue),
                       ),
                     ),
@@ -117,10 +117,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       runSpacing: 4,
                       children: [
                         ActionChip(
-                          label: const Text('Wi-Fi (10.10.3.5)', style: TextStyle(fontSize: 11)),
+                          label: const Text('Red Local (192.168.10.11)', style: TextStyle(fontSize: 11)),
                           onPressed: () {
                             setDialogState(() {
-                              serverController.text = '10.10.3.5';
+                              serverController.text = '192.168.10.11';
                               testResult = null;
                             });
                           },

@@ -91,13 +91,21 @@ const SolicitudesPage = () => {
       setIsDetailOpen(false);
       fetchSolicitudes();
 
-      // Si fue un alta, ofrecemos generar e imprimir el QR de inmediato
+      // Si fue un alta o edición con traslado de ambiente, obligar/ofrecer imprimir el QR de inmediato
       if (solicitud.tipo === 'alta' && (activo || solicitud.activo_resultante)) {
         const activoFinal = activo || solicitud.activo_resultante;
         setAltaAprobadaInfo({
           codigo: activoFinal.codigo_activo,
           activo: activoFinal
         });
+      } else if (solicitud.tipo === 'edicion' && solicitud.datos?.ambiente_id) {
+        const activoFinal = activo || solicitud.activo;
+        if (activoFinal) {
+          setAltaAprobadaInfo({
+            codigo: activoFinal.codigo_activo,
+            activo: activoFinal
+          });
+        }
       }
     } catch (err) {
       console.error('Error al aprobar solicitud:', err);

@@ -123,30 +123,15 @@ class ActivoRepository {
       debugPrint('Error obteniendo activo de red, consultando caché SQLite: $e');
       try {
         final db = await _localDb.database;
-        final rows = await db.query(
-          'cache_activos',
-          where: 'uuid = ? OR id = ? OR codigo_activo = ?',
-          whereArgs: [codigo, codigo, codigo],
-          limit: 1,
-        );
+        final rows = await db.rawQuery('''
+          SELECT a.*, amb.nombre as ambiente_nombre, amb.ubicacion as ambiente_ubicacion
+          FROM cache_activos a
+          LEFT JOIN cache_ambientes amb ON a.ambiente_id = amb.id
+          WHERE a.uuid = ? OR a.id = ? OR a.codigo_activo = ?
+          LIMIT 1
+        ''', [codigo, codigo, codigo]);
         if (rows.isNotEmpty) {
-          final r = rows.first;
-          return ActivoModel(
-            id: r['id'] as String,
-            uuid: (r['uuid'] ?? r['id'] ?? '').toString(),
-            nombre: (r['nombre'] ?? '').toString(),
-            tipo: (r['tipo'] ?? '').toString(),
-            marca: (r['marca'] ?? '').toString(),
-            modelo: (r['modelo'] ?? '').toString(),
-            numeroSerie: (r['numero_serie'] ?? '').toString(),
-            estado: (r['estado'] ?? 'Activo').toString(),
-            ambienteId: (r['ambiente_id'] ?? '').toString(),
-            ambienteRegistroId: r['ambiente_registro_id']?.toString(),
-            qrCodigo: (r['codigo_activo'] ?? '').toString(),
-            imagenUrl: r['imagen_url']?.toString(),
-            observaciones: r['observaciones']?.toString(),
-            numeroCorrelativo: r['numero_correlativo'] as int?,
-          );
+          return ActivoModel.fromJson(rows.first);
         }
       } catch (_) {}
       return null;
@@ -256,9 +241,76 @@ class ActivoRepository {
       if (response is List) {
         activos = response.map((json) => ActivoModel.fromJson(json as Map<String, dynamic>)).toList();
       }
+      if (activos.isNotEmpty) {
+        await _cacheActivosLoteLocal(activos);
+      }
       return activos;
     } catch (e) {
       debugPrint('Error obteniendo todos los activos: $e');
+      return await _getCachedTodosLosActivos();
+    }
+  }
+
+  Future<void> _cacheActivosLoteLocal(List<ActivoModel> activos) async {
+    try {
+      final db = await _localDb.database;
+      final batch = db.batch();
+      for (var a in activos) {
+        batch.insert(
+          'cache_activos',
+          {
+            'id': a.id,
+            'uuid': a.uuid,
+            'nombre': a.nombre,
+            'tipo': a.tipo,
+            'marca': a.marca,
+            'modelo': a.modelo,
+            'numero_serie': a.numeroSerie,
+            'estado': a.estado,
+            'ambiente_id': a.ambienteId,
+            'ambiente_registro_id': a.ambienteRegistroId,
+            'codigo_activo': a.qrCodigo,
+            'imagen_url': a.imagenUrl,
+            'observaciones': a.observaciones,
+            'numero_correlativo': a.numeroCorrelativo,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
+    } catch (e) {
+      debugPrint('Error cacheando lote de activos en SQLite: $e');
+    }
+  }
+
+  Future<List<ActivoModel>> _getCachedTodosLosActivos() async {
+    try {
+      final db = await _localDb.database;
+      final rows = await db.rawQuery('''
+        SELECT a.*, amb.nombre as ambiente_nombre, amb.ubicacion as ambiente_ubicacion
+        FROM cache_activos a
+        LEFT JOIN cache_ambientes amb ON a.ambiente_id = amb.id
+      ''');
+      return rows.map((r) => ActivoModel(
+        id: r['id'] as String,
+        uuid: (r['uuid'] ?? r['id'] ?? '').toString(),
+        nombre: (r['nombre'] ?? '').toString(),
+        tipo: (r['tipo'] ?? '').toString(),
+        marca: (r['marca'] ?? '').toString(),
+        modelo: (r['modelo'] ?? '').toString(),
+        numeroSerie: (r['numero_serie'] ?? '').toString(),
+        estado: (r['estado'] ?? 'Activo').toString(),
+        ambienteId: (r['ambiente_id'] ?? '').toString(),
+        ambienteRegistroId: r['ambiente_registro_id']?.toString(),
+        qrCodigo: (r['codigo_activo'] ?? '').toString(),
+        imagenUrl: r['imagen_url']?.toString(),
+        observaciones: r['observaciones']?.toString(),
+        numeroCorrelativo: r['numero_correlativo'] as int?,
+        ambienteNombre: r['ambiente_nombre']?.toString(),
+        ambienteUbicacion: r['ambiente_ubicacion']?.toString(),
+      )).toList();
+    } catch (e) {
+      debugPrint('Error leyendo todos los activos en caché: $e');
       return [];
     }
   }

@@ -201,5 +201,61 @@ void main() {
       expect(eval.distanceMeters, greaterThan(18.0));
       expect(eval.message, contains('Fuera de'));
     });
+
+    test('7. Regla de desambiguación: Usuario en Lab 3 intentando auditar Lab 1 es rechazado (isInside == false y detecta cercanía a Lab 3)', () {
+      // Usuario ubicado en el centro exacto de Lab 3 (-16.577892, -68.196768) con buena precisión (8m)
+      final posEnLab3 = Position(
+        latitude: -16.577892,
+        longitude: -68.196768,
+        timestamp: DateTime.now(),
+        accuracy: 8.0,
+        altitude: 3600.0,
+        heading: 0.0,
+        speed: 0.0,
+        altitudeAccuracy: 0.0,
+        headingAccuracy: 0.0,
+        speedAccuracy: 0.0,
+      );
+
+      final eval = locationService.evaluateGeofence(
+        position: posEnLab3,
+        targetLat: -16.577738, // Lab 1
+        targetLon: -68.196556, // Lab 1
+        radiusMeters: 18.0,
+        ambienteNombre: 'Laboratorio 1',
+      );
+
+      expect(eval.accuracyValid, isTrue);
+      expect(eval.isInside, isFalse, reason: 'No debe permitir auditar Lab 1 si el usuario está en Lab 3');
+      expect(eval.message, contains('Lab 3'));
+    });
+
+    test('8. Regla de desambiguación: Usuario con lectura a 17m de Lab 1 pero más cerca de otro ambiente es rechazado para Lab 1', () {
+      // Posición a ~17m de Lab 1 pero más cerca de otro ambiente (zona de solapamiento teórico)
+      final posIntermedia = Position(
+        latitude: -16.577830,
+        longitude: -68.196683,
+        timestamp: DateTime.now(),
+        accuracy: 10.0,
+        altitude: 3600.0,
+        heading: 0.0,
+        speed: 0.0,
+        altitudeAccuracy: 0.0,
+        headingAccuracy: 0.0,
+        speedAccuracy: 0.0,
+      );
+
+      final eval = locationService.evaluateGeofence(
+        position: posIntermedia,
+        targetLat: -16.577738, // Lab 1
+        targetLon: -68.196556, // Lab 1
+        radiusMeters: 18.0,
+        ambienteNombre: 'Laboratorio 1',
+      );
+
+      expect(eval.accuracyValid, isTrue);
+      expect(eval.isInside, isFalse, reason: 'Debe rechazar Lab 1 porque el usuario está más cerca de otro ambiente');
+      expect(eval.message, contains('Estás más cerca de'));
+    });
   });
 }

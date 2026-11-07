@@ -11,7 +11,9 @@ import 'package:inventario_qr_app/view/screens/resultados_auditoria_screen.dart'
 import 'package:inventario_qr_app/view/screens/equipos_management_screen.dart';
 import 'package:inventario_qr_app/view/screens/formulario_equipo_screen.dart';
 import 'package:inventario_qr_app/view/screens/mis_solicitudes_screen.dart';
+import 'package:inventario_qr_app/view/screens/station_detail_screen.dart';
 import 'package:inventario_qr_app/models/activo_model.dart';
+import 'package:inventario_qr_app/models/estacion_model.dart';
 
 class AppRoutes {
   static const String login = '/login';
@@ -19,6 +21,7 @@ class AppRoutes {
   static const String activosDetalle = '/activos-detalle';
   static const String selectAmbienteAuditoria = '/select-ambiente-auditoria';
   static const String auditoria = '/auditoria';
+  static const String stationDetail = '/estacion-detalle';
 
   static const String qrScanOptimizado = '/qr-scan-optimizado';
   static const String qrScanSimple = '/qr-scan-simple';
@@ -55,6 +58,24 @@ class AppRoutes {
         );
       case misSolicitudes:
         return MaterialPageRoute(builder: (_) => const MisSolicitudesScreen());
+      case stationDetail:
+        final args = settings.arguments;
+        String codigo = '';
+        EstacionModel? estacion;
+        if (args is String) {
+          codigo = args;
+        } else if (args is EstacionModel) {
+          codigo = args.codigoEstacion;
+          estacion = args;
+        } else if (args is Map<String, dynamic>) {
+          codigo = args['codigo']?.toString() ?? '';
+        }
+        return MaterialPageRoute(
+          builder: (_) => StationDetailScreen(
+            codigoEstacion: codigo,
+            estacionInicial: estacion,
+          ),
+        );
       default:
         return MaterialPageRoute(
           builder: (_) => const Scaffold(

@@ -20,6 +20,7 @@ const InventoryPage = () => {
   const [selectedIds, setSelectedIds] = useState([]);
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
   const [assetsToPrint, setAssetsToPrint] = useState([]);
+  const [qrAlertMessage, setQrAlertMessage] = useState(null);
 
   useEffect(() => {
     fetchInventory();
@@ -86,15 +87,37 @@ const InventoryPage = () => {
     setIsFormModalOpen(true);
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('¿Está seguro de que desea eliminar este equipo?')) {
+  const handleFormSuccess = (savedAsset, meta = {}) => {
+    fetchInventory();
+    if (meta.huboCambioAmbiente && savedAsset) {
+      // El activo fue trasladado a otro ambiente: obligar a imprimir de nuevo su QR
+      setAssetsToPrint([savedAsset]);
+      setQrAlertMessage(`¡Ambiente actualizado! El activo "${savedAsset.nombre || savedAsset.codigo_activo}" fue trasladado al ambiente "${savedAsset.ambiente?.nombre || 'nuevo ambiente'}". Por protocolo institucional, es obligatorio reimprimir y adherir la nueva etiqueta QR.`);
+      setIsQRModalOpen(true);
+    }
+  };
+
+  const handleDelete = async (assetOrId) => {
+    const id = typeof assetOrId === 'object' && assetOrId !== null ? assetOrId.id : assetOrId;
+    const item = typeof assetOrId === 'object' && assetOrId !== null 
+      ? assetOrId 
+      : hardware.find(h => h.id === id);
+
+    const esInactivo = item?.estado?.toLowerCase() === 'inactivo';
+    const confirmMsg = esInactivo
+      ? `El equipo "${item?.nombre || item?.codigo_activo || 'seleccionado'}" ya se encuentra inactivo (dado de baja).\n\n¿Desea ELIMINARLO DEFINITIVAMENTE de la base de datos?\nEsta acción es irreversible y lo quitará por completo del inventario.`
+      : `¿Está seguro de que desea eliminar el equipo "${item?.nombre || item?.codigo_activo || 'seleccionado'}"?`;
+
+    if (window.confirm(confirmMsg)) {
       try {
-        await api.delete(`/inventory/${id}`);
+        await api.delete(`/inventory/${id}${esInactivo ? '?permanente=true' : ''}`);
+        // Actualizar estado local inmediatamente para desaparición instantánea
+        setHardware(prev => prev.filter(h => h.id !== id));
         setSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
         fetchInventory();
       } catch (err) {
         console.error('Error al eliminar:', err);
-        alert('Error al eliminar el equipo.');
+        alert('Error al eliminar el equipo: ' + (err.response?.data?.message || err.message));
       }
     }
   };
@@ -125,11 +148,13 @@ const InventoryPage = () => {
     if (selectedIds.length === 0) return;
     const items = hardware.filter(h => selectedIds.includes(h.id));
     setAssetsToPrint(items);
+    setQrAlertMessage(null);
     setIsQRModalOpen(true);
   };
 
   const handlePrintSingle = (item) => {
     setAssetsToPrint([item]);
+    setQrAlertMessage(null);
     setIsQRModalOpen(true);
   };
 
@@ -316,7 +341,7 @@ const InventoryPage = () => {
       <HardwareFormModal 
         isOpen={isFormModalOpen}
         onClose={() => setIsFormModalOpen(false)}
-        onSuccess={fetchInventory}
+        onSuccess={handleFormSuccess}
         editData={selectedItem}
       />
 
@@ -331,8 +356,12 @@ const InventoryPage = () => {
 
       <QRPrintModal 
         isOpen={isQRModalOpen}
-        onClose={() => setIsQRModalOpen(false)}
+        onClose={() => {
+          setIsQRModalOpen(false);
+          setQrAlertMessage(null);
+        }}
         assetsToPrint={assetsToPrint}
+        alertMessage={qrAlertMessage}
       />
     </div>
   );

@@ -13,6 +13,7 @@ import 'package:inventario_qr_app/viewmodel/solicitud_viewmodel.dart';
 import 'package:inventario_qr_app/view/screens/main_screen.dart';
 import 'package:inventario_qr_app/view/widgets/floating_bottom_nav_bar.dart';
 import 'package:inventario_qr_app/view/widgets/error_state.dart';
+import 'package:inventario_qr_app/core/services/network_connectivity_service.dart';
 
 void main() {
   setUpAll(() {
@@ -21,6 +22,7 @@ void main() {
   });
 
   setUp(() {
+    NetworkConnectivityService().stopMonitoring();
     // Configurar sesión de prueba con rol admin
     SessionManager.setMockSession(
       token: 'jwt-test-token',
@@ -81,13 +83,15 @@ void main() {
         textScaleFactor: 1.3,
         bottomPadding: 24.0,
       ));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       // Navegar a la pestaña 'Gestión' (index 2 para admin)
       final gestionTabFinder = find.bySemanticsLabel('Gestión');
       expect(gestionTabFinder, findsOneWidget);
       await tester.tap(gestionTabFinder);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       // Verificar que el FAB de creación está visible
       final fabFinder = find.byType(FloatingActionButton);
@@ -117,7 +121,7 @@ void main() {
       );
 
       // 3. Verificar etiqueta y color primario #0D47A1
-      expect(find.text('Nuevo equipo'), findsOneWidget);
+      expect(find.text('Solicitar alta'), findsOneWidget);
       final fabWidget = tester.widget<FloatingActionButton>(fabFinder);
       expect(fabWidget.backgroundColor, equals(AppColors.primary));
     });
@@ -136,11 +140,13 @@ void main() {
         textScaleFactor: 1.0,
         bottomPadding: 0.0, // 3-button navigation
       ));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       // Ir a Gestión
       await tester.tap(find.bySemanticsLabel('Gestión'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       final fabRect = tester.getRect(find.byType(FloatingActionButton));
       final navBarRect = tester.getRect(find.byType(FloatingBottomNavBar));

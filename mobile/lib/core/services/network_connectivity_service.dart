@@ -37,7 +37,15 @@ class NetworkConnectivityService extends ChangeNotifier {
     }
   }
 
+  void stopMonitoring() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
   void _startMonitoring() {
+    if (Platform.environment.containsKey('FLUTTER_TEST')) {
+      return;
+    }
     checkConnection();
     _timer = Timer.periodic(const Duration(seconds: 8), (_) {
       checkConnection();

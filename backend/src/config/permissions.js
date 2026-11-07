@@ -75,7 +75,15 @@ const PERMISSIONS = {
   'solicitudes:listar': ['admin', 'tecnico'],
   'solicitudes:ver': ['admin', 'tecnico'],
   'solicitudes:aprobar': ['admin'],
-  'solicitudes:rechazar': ['admin']
+  'solicitudes:rechazar': ['admin'],
+
+  // 11. Estaciones de Trabajo (Mesa / QR General)
+  'estaciones:listar': ['admin', 'tecnico', 'auditor'],
+  'estaciones:ver': ['admin', 'tecnico', 'auditor'],
+  'estaciones:crear': ['admin'],
+  'estaciones:editar': ['admin'],
+  'estaciones:eliminar': ['admin'],
+  'estaciones:asignar': ['admin', 'tecnico']
 };
 
 module.exports = { PERMISSIONS };

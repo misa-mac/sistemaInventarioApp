@@ -16,6 +16,7 @@ const CAMPOS_PERMITIDOS_EDICION = [
   'marca',
   'modelo',
   'numero_serie',
+  'ambiente_id',
   'origen',
   'especificacion_origen',
   'descripcion',
@@ -34,7 +35,6 @@ const CAMPOS_PERMITIDOS_ALTA = [
   'numero_serie',
   'tipo_activo_id',
   'ambiente_id',
-  'ambiente_registro_id',
   'origen',
   'especificacion_origen',
   'descripcion',
@@ -89,6 +89,7 @@ exports.create = async (req, res) => {
       // Prohibir terminantemente código o correlativo calculado por el cliente
       delete sanitizedDatos.codigo_activo;
       delete sanitizedDatos.numero_correlativo;
+      delete sanitizedDatos.ambiente_registro_id;
 
       if (!sanitizedDatos.tipo_activo_id || !isUuid(sanitizedDatos.tipo_activo_id)) {
         return res.status(400).json({ message: 'tipo_activo_id es requerido y debe ser un UUID válido.' });
@@ -105,15 +106,6 @@ exports.create = async (req, res) => {
       const ambienteExiste = await Ambiente.findByPk(sanitizedDatos.ambiente_id);
       if (!ambienteExiste) {
         return res.status(400).json({ message: 'El ambiente_id especificado no existe.' });
-      }
-
-      if (sanitizedDatos.ambiente_registro_id) {
-        const ambRegExiste = await Ambiente.findByPk(sanitizedDatos.ambiente_registro_id);
-        if (!ambRegExiste) {
-          return res.status(400).json({ message: 'El ambiente_registro_id especificado no existe.' });
-        }
-      } else {
-        sanitizedDatos.ambiente_registro_id = sanitizedDatos.ambiente_id;
       }
     } else if (tipo === 'edicion') {
       if (!activo_id || !isUuid(activo_id)) {
@@ -242,7 +234,6 @@ exports.getAll = async (req, res) => {
           include: [
             { model: TipoActivo, as: 'tipo', attributes: ['id', 'nombre', 'codigo'] },
             { model: Ambiente, as: 'ambiente', attributes: ['id', 'nombre', 'codigo'] },
-            { model: Ambiente, as: 'ambiente_registro', attributes: ['id', 'nombre', 'codigo'] },
           ]
         },
         {
@@ -251,7 +242,6 @@ exports.getAll = async (req, res) => {
           include: [
             { model: TipoActivo, as: 'tipo', attributes: ['id', 'nombre', 'codigo'] },
             { model: Ambiente, as: 'ambiente', attributes: ['id', 'nombre', 'codigo'] },
-            { model: Ambiente, as: 'ambiente_registro', attributes: ['id', 'nombre', 'codigo'] },
           ]
         },
       ],
@@ -307,7 +297,6 @@ exports.getById = async (req, res) => {
           include: [
             { model: TipoActivo, as: 'tipo' },
             { model: Ambiente, as: 'ambiente' },
-            { model: Ambiente, as: 'ambiente_registro' },
           ]
         },
         {
@@ -316,7 +305,6 @@ exports.getById = async (req, res) => {
           include: [
             { model: TipoActivo, as: 'tipo' },
             { model: Ambiente, as: 'ambiente' },
-            { model: Ambiente, as: 'ambiente_registro' },
           ]
         },
       ]
@@ -368,10 +356,7 @@ exports.aprobar = async (req, res) => {
       // Dejar que el trigger de base de datos genere codigo_activo y numero_correlativo
       delete datosAlta.codigo_activo;
       delete datosAlta.numero_correlativo;
-
-      if (!datosAlta.ambiente_registro_id) {
-        datosAlta.ambiente_registro_id = datosAlta.ambiente_id;
-      }
+      delete datosAlta.ambiente_registro_id;
 
       const nuevoActivo = await Activo.create(datosAlta, { transaction: t });
       
@@ -386,6 +371,8 @@ exports.aprobar = async (req, res) => {
         return res.status(404).json({ message: 'El activo asociado ya no existe' });
       }
 
+      const ambienteAnterior = activo.ambiente_id;
+      const codigoAnterior = activo.codigo_activo;
       const updates = {};
       for (const campo of CAMPOS_PERMITIDOS_EDICION) {
         if (solicitud.datos[campo] !== undefined) {
@@ -393,7 +380,31 @@ exports.aprobar = async (req, res) => {
         }
       }
 
+      delete updates.codigo_activo;
+      delete updates.numero_correlativo;
+      delete updates.ambiente_registro_id;
+
       await activo.update(updates, { transaction: t });
+      // Recargar para capturar el nuevo codigo_activo y numero_correlativo calculados por el trigger de traslado
+      await activo.reload({ transaction: t });
+
+      // Si la edición implicó cambio de ambiente (traslado), registrar el movimiento
+      if (updates.ambiente_id && updates.ambiente_id !== ambienteAnterior) {
+        const nuevoAmbiente = await Ambiente.findByPk(updates.ambiente_id, { transaction: t });
+        await Movimiento.create({
+          tipo_evento: 'traslado',
+          activo_id: activo.id,
+          usuario_id: req.user.id,
+          ambiente_origen_id: ambienteAnterior,
+          ambiente_destino_id: updates.ambiente_id,
+          estado_anterior: activo.estado,
+          estado_nuevo: updates.estado || activo.estado,
+          tipo_mantenimiento: null,
+          piezas_reemplazadas: null,
+          costo_mantenimiento: null,
+          observaciones: `Traslado a ${nuevoAmbiente ? nuevoAmbiente.nombre : updates.ambiente_id}. Código QR actualizado de ${codigoAnterior} a ${activo.codigo_activo}`
+        }, { transaction: t });
+      }
     } else if (solicitud.tipo === 'baja') {
       const activo = await Activo.findByPk(solicitud.activo_id, { transaction: t });
       if (!activo) {

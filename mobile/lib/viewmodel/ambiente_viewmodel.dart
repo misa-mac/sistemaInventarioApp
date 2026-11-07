@@ -77,6 +77,14 @@ class AmbienteViewModel extends ChangeNotifier {
           targetLon: _ambienteSeleccionado!.longitude,
           radiusMeters: _ambienteSeleccionado!.radioGeofence,
           ambienteNombre: _ambienteSeleccionado!.nombre,
+          allGeofences: _ambientes.isNotEmpty
+              ? _ambientes.map((a) => GeofenceParam(
+                    name: a.nombre,
+                    lat: a.latitude,
+                    lng: a.longitude,
+                    radius: a.radioGeofence,
+                  )).toList()
+              : null,
         );
         _dentroDeGeofence = _resultadoGeocerca!.isInside;
         _mensajeUbicacion = _resultadoGeocerca!.message;

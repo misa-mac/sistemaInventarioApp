@@ -6,6 +6,9 @@
 -- Esquema                : public
 -- Arquitectura           : Gobernanza centralizada (Web es autoridad,
 --                          Móvil propone solicitudes, Web aprueba/rechaza)
+-- Sistema Híbrido de QR  : Estaciones de Trabajo (Mesas de laboratorio con
+--                          código QR General EST-... y 4 componentes vinculados)
+--                          junto a trazabilidad por activo individual XYZAACC-GG.
 -- Seguridad              : Principio de menor privilegio (rol app_inventario),
 --                          Inmutabilidad de auditoría (OWASP A09),
 --                          Código único de activo XYZAACC-GG autogenerado.
@@ -33,6 +36,7 @@ DROP TABLE IF EXISTS notificaciones CASCADE;
 DROP TABLE IF EXISTS movimientos CASCADE;
 DROP TABLE IF EXISTS solicitudes_cambio CASCADE;
 DROP TABLE IF EXISTS activos CASCADE;
+DROP TABLE IF EXISTS estaciones_trabajo CASCADE;
 DROP TABLE IF EXISTS ambientes CASCADE;
 DROP TABLE IF EXISTS tipo_activos CASCADE;
 DROP TABLE IF EXISTS usuarios CASCADE;
@@ -274,7 +278,17 @@ CREATE TABLE ambientes (
   CHECK ((latitude IS NULL) = (longitude IS NULL))
 );
 
--- 3.4 ACTIVOS (Equipos con código normalizado XYZAACC-GG)
+-- 3.4 ESTACIONES_TRABAJO (Sistema Híbrido de QR - Mesas de Laboratorio)
+CREATE TABLE estaciones_trabajo (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  codigo_estacion VARCHAR(50)  NOT NULL UNIQUE,
+  ambiente_id     UUID         NOT NULL REFERENCES ambientes(id) ON DELETE RESTRICT,
+  descripcion     VARCHAR(255),
+  created_at      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+-- 3.5 ACTIVOS (Equipos con código normalizado XYZAACC-GG)
 CREATE TABLE activos (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   codigo_activo        VARCHAR(20) NOT NULL UNIQUE CHECK (codigo_activo ~ '^[0-9]{7}-[0-9]{2}$'),
@@ -282,6 +296,7 @@ CREATE TABLE activos (
   tipo_activo_id       UUID        NOT NULL REFERENCES tipo_activos(id),
   ambiente_id          UUID        NOT NULL REFERENCES ambientes(id),
   ambiente_registro_id UUID        NOT NULL REFERENCES ambientes(id),
+  estacion_id          UUID        REFERENCES estaciones_trabajo(id) ON DELETE SET NULL,
   nombre               VARCHAR(150) NOT NULL,
   marca                VARCHAR(100),
   modelo               VARCHAR(100),
@@ -300,7 +315,7 @@ CREATE TABLE activos (
   UNIQUE (tipo_activo_id, ambiente_registro_id, numero_correlativo)
 );
 
--- 3.5 SOLICITUDES_CAMBIO (Mecanismo central de gobernanza de inventario)
+-- 3.6 SOLICITUDES_CAMBIO (Mecanismo central de gobernanza de inventario)
 CREATE TABLE solicitudes_cambio (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tipo                 tipo_solicitud   NOT NULL,
@@ -323,7 +338,7 @@ CREATE TABLE solicitudes_cambio (
   CHECK (estado = 'pendiente' OR (revisor_id IS NOT NULL AND revisado_at IS NOT NULL))
 );
 
--- 3.6 MOVIMIENTOS (Historial de traslados, mantenimientos y bajas)
+-- 3.7 MOVIMIENTOS (Historial de traslados, mantenimientos y bajas)
 CREATE TABLE movimientos (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tipo_evento         tipo_evento NOT NULL,
@@ -349,7 +364,7 @@ CREATE TABLE movimientos (
              AND ambiente_origen_id <> ambiente_destino_id))
 );
 
--- 3.7 NOTIFICACIONES (Alertas del sistema y avisos de flujo)
+-- 3.8 NOTIFICACIONES (Alertas del sistema y avisos de flujo)
 CREATE TABLE notificaciones (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   usuario_id UUID REFERENCES usuarios(id), -- NULL = Notificación global de administración
@@ -360,7 +375,7 @@ CREATE TABLE notificaciones (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 3.8 AUDITORIAS (Sesiones de control físico iniciadas desde app móvil)
+-- 3.9 AUDITORIAS (Sesiones de control físico iniciadas desde app móvil)
 CREATE TABLE auditorias (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ambiente_id        UUID NOT NULL REFERENCES ambientes(id),
@@ -377,7 +392,7 @@ CREATE TABLE auditorias (
   CHECK (fecha_fin IS NULL OR fecha_fin >= fecha_inicio)
 );
 
--- 3.9 DETALLE_AUDITORIA (Lecturas físicas de etiquetas QR)
+-- 3.10 DETALLE_AUDITORIA (Lecturas físicas de etiquetas QR)
 CREATE TABLE detalle_auditoria (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   auditoria_id        UUID NOT NULL REFERENCES auditorias(id) ON DELETE CASCADE,
@@ -391,7 +406,7 @@ CREATE TABLE detalle_auditoria (
   CHECK (estado = 'faltante'    OR codigo_qr_escaneado IS NOT NULL)
 );
 
--- 3.10 AUDIT_LOGS (Bitácora inmutable OWASP A09 de trazabilidad y seguridad)
+-- 3.11 AUDIT_LOGS (Bitácora inmutable OWASP A09 de trazabilidad y seguridad)
 CREATE TABLE audit_logs (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   usuario_id UUID REFERENCES usuarios(id),
@@ -449,6 +464,10 @@ CREATE TRIGGER trg_ambientes_updated
   BEFORE UPDATE ON ambientes
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+CREATE TRIGGER trg_estaciones_trabajo_updated
+  BEFORE UPDATE ON estaciones_trabajo
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
 CREATE TRIGGER trg_activos_updated
   BEFORE UPDATE ON activos
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -460,6 +479,9 @@ CREATE TRIGGER trg_solicitudes_cambio_updated
 -- =====================================================================
 -- 5. ÍNDICES DE RENDIMIENTO Y BÚSQUEDA
 -- =====================================================================
+CREATE INDEX idx_estaciones_ambiente    ON estaciones_trabajo(ambiente_id);
+CREATE INDEX idx_estaciones_codigo      ON estaciones_trabajo(codigo_estacion);
+CREATE INDEX idx_activos_estacion_id    ON activos(estacion_id);
 CREATE INDEX idx_activos_ambiente       ON activos(ambiente_id);
 CREATE INDEX idx_activos_tipo           ON activos(tipo_activo_id);
 CREATE INDEX idx_activos_serie          ON activos(numero_serie) WHERE numero_serie IS NOT NULL;
@@ -499,6 +521,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
   usuarios,
   tipo_activos,
   ambientes,
+  estaciones_trabajo,
   activos,
   movimientos,
   notificaciones,
@@ -572,14 +595,25 @@ SET
   rol             = EXCLUDED.rol,
   activo          = EXCLUDED.activo;
 
--- 7.4 Registro de Inicialización en Bitácora de Auditoría
+-- 7.4 Estaciones de Trabajo Iniciales (Mesas con QR General)
+INSERT INTO estaciones_trabajo (codigo_estacion, ambiente_id, descripcion)
+SELECT 'EST-LAB1-01', id, 'Mesa 01 - Laboratorio 1 (Fila Frontal)'
+FROM ambientes WHERE codigo = 20
+ON CONFLICT (codigo_estacion) DO NOTHING;
+
+INSERT INTO estaciones_trabajo (codigo_estacion, ambiente_id, descripcion)
+SELECT 'EST-LAB1-02', id, 'Mesa 02 - Laboratorio 1 (Fila Frontal)'
+FROM ambientes WHERE codigo = 20
+ON CONFLICT (codigo_estacion) DO NOTHING;
+
+-- 7.5 Registro de Inicialización en Bitácora de Auditoría
 INSERT INTO audit_logs (accion, recurso, recurso_id, resultado, detalles, ip_address, user_agent)
 VALUES (
   'INIT_SCHEMA',
   'DATABASE',
   'inventario_db',
   'exitoso',
-  'Esquema unificado final inicializado con éxito. Catálogos, gobernanza y seguridad aplicados.',
+  'Esquema unificado final inicializado con éxito. Catálogos, gobernanza, seguridad y sistema híbrido de estaciones aplicados.',
   '127.0.0.1',
   'PostgreSQL Setup Script'
 );

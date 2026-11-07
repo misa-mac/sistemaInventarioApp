@@ -135,8 +135,8 @@ describe('Gobernanza de Inventario - Suite de Pruebas de Solicitudes y Seguridad
     // Verificar en la BD el activo creado
     const activoCreado = await Activo.findByPk(resAprobar.body.solicitud.activo_resultante_id);
     expect(activoCreado).not.toBeNull();
-    // Validar formato estricto XYZAACC-GG: '1' + 2 dígitos año + 2 dígitos tipo + 2 dígitos ambiente + '-' + 2 dígitos correlativo
-    expect(activoCreado.codigo_activo).toMatch(/^1[0-9]{6}-[0-9]{2}$/);
+    // Validar formato estricto real X·CC·TT·AA·NNNN-YY: '1' + 50 (carrera) + TT (tipo) + AA (ambiente) + NNNN (correlativo 1..4 dígitos sin ceros) + '-' + YY (año)
+    expect(activoCreado.codigo_activo).toMatch(/^1[0-9]{2}[0-9]{2}[0-9]{2}[0-9]{1,4}-[0-9]{2}$/);
     expect(activoCreado.numero_correlativo).toBeGreaterThan(0);
   });
 

@@ -2,6 +2,7 @@ const { DataTypes } = require('sequelize');
 const { sequelize } = require('../../database');
 const Ambiente = require('./Ambiente');
 const TipoActivo = require('./TipoActivo');
+const EstacionTrabajo = require('./EstacionTrabajo');
 
 const Activo = sequelize.define('Activo', {
   id: {
@@ -26,15 +27,15 @@ const Activo = sequelize.define('Activo', {
       key: 'id'
     }
   },
-  ambiente_id: {
+  estacion_id: {
     type: DataTypes.UUID,
-    allowNull: false,
+    allowNull: true,
     references: {
-      model: Ambiente,
+      model: EstacionTrabajo,
       key: 'id'
     }
   },
-  ambiente_registro_id: {
+  ambiente_id: {
     type: DataTypes.UUID,
     allowNull: false,
     references: {
@@ -103,12 +104,12 @@ const Activo = sequelize.define('Activo', {
 });
 
 Activo.belongsTo(Ambiente, { foreignKey: 'ambiente_id', as: 'ambiente' });
-Ambiente.hasMany(Activo, { foreignKey: 'ambiente_id', as: 'activos_actuales' });
-
-Activo.belongsTo(Ambiente, { foreignKey: 'ambiente_registro_id', as: 'ambiente_registro' });
-Ambiente.hasMany(Activo, { foreignKey: 'ambiente_registro_id', as: 'activos_registrados' });
+Ambiente.hasMany(Activo, { foreignKey: 'ambiente_id', as: 'activos' });
 
 Activo.belongsTo(TipoActivo, { foreignKey: 'tipo_activo_id', as: 'tipo' });
 TipoActivo.hasMany(Activo, { foreignKey: 'tipo_activo_id', as: 'activos' });
+
+Activo.belongsTo(EstacionTrabajo, { foreignKey: 'estacion_id', as: 'estacion' });
+EstacionTrabajo.hasMany(Activo, { foreignKey: 'estacion_id', as: 'activos' });
 
 module.exports = Activo;

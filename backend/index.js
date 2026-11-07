@@ -16,6 +16,7 @@ require('./src/models/Auditoria');
 require('./src/models/DetalleAuditoria');
 require('./src/models/AuditLog');
 require('./src/models/SolicitudCambio');
+require('./src/models/EstacionTrabajo');
 
 // Importar Rutas
 const authRoutes = require('./src/routes/authRoutes');
@@ -29,6 +30,7 @@ const notificacionRoutes = require('./src/routes/notificacionRoutes');
 const auditoriaRoutes = require('./src/routes/auditoriaRoutes');
 const auditLogRoutes = require('./src/routes/auditLogRoutes');
 const solicitudRoutes = require('./src/routes/solicitudRoutes');
+const estacionRoutes = require('./src/routes/estacionRoutes');
 
 dotenv.config();
 
@@ -54,6 +56,7 @@ app.use('/api/notificaciones', notificacionRoutes);
 app.use('/api/auditorias', auditoriaRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/solicitudes', solicitudRoutes);
+app.use('/api/estaciones', estacionRoutes);
 
 // Configuración Servidor
 const PORT = process.env.PORT || 3000;

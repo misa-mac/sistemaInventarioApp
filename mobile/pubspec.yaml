@@ -94,14 +94,23 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
+  web:
+    generate: true
+    image_path: "assets/images/logo_itbm.png"
+  windows:
+    generate: true
+    image_path: "assets/images/logo_itbm.png"
   image_path: "assets/images/logo_itbm.png"
 
 flutter_native_splash:
   color: "#FFFFFF"
-  image: assets/images/logo_itbm_splash.png
+  image: assets/images/splash_logo_with_name.png
+  branding: assets/images/splash_branding.png
+  branding_mode: bottom
   android_12:
     color: "#FFFFFF"
-    image: assets/images/logo_itbm_splash.png
+    image: assets/images/splash_logo_with_name.png
+    branding: assets/images/splash_branding.png
     icon_background_color: "#FFFFFF"
   android: true
   ios: true

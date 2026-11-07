@@ -86,15 +86,6 @@ const AssetDetailsModal = ({ isOpen, onClose, asset, onEdit, onDelete, onPrintQR
                   <p className="text-on-surface font-semibold text-base">{asset.ambiente?.nombre || 'N/A'}</p>
                 </div>
 
-                {asset.ambiente_registro && (
-                  <div>
-                    <p className="text-on-surface-variant font-medium text-xs uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <Layers size={14} /> Ambiente de Registro
-                    </p>
-                    <p className="text-on-surface font-medium">{asset.ambiente_registro.nombre}</p>
-                  </div>
-                )}
-
                 <div>
                   <p className="text-on-surface-variant font-medium text-xs uppercase tracking-wider mb-1 flex items-center gap-1">
                     <Hash size={14} /> Número de Serie
@@ -159,10 +150,11 @@ const AssetDetailsModal = ({ isOpen, onClose, asset, onEdit, onDelete, onPrintQR
             )}
             {onDelete && (
               <button 
-                onClick={() => { onClose(); onDelete(asset.id); }} 
+                onClick={() => { onClose(); onDelete(asset); }} 
                 className="flex items-center gap-1.5 px-3 py-1.5 border border-error/30 text-error hover:bg-error-container/20 rounded text-sm font-medium transition-colors"
+                title={asset.estado === 'Inactivo' ? 'Borrar permanentemente de la base de datos' : 'Dar de baja o eliminar el activo'}
               >
-                <Trash2 size={16} /> Eliminar
+                <Trash2 size={16} /> {asset.estado === 'Inactivo' ? 'Eliminar Definitivamente' : 'Eliminar'}
               </button>
             )}
           </div>

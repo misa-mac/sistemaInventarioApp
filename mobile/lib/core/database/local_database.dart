@@ -8,7 +8,7 @@ import 'package:flutter/foundation.dart';
 /// preparación para migraciones futuras mediante [onUpgrade].
 class LocalDatabase {
   static const String _dbName = 'inventario_itbm.db';
-  static const int _dbVersion = 4;
+  static const int _dbVersion = 5;
 
   // Singleton
   static final LocalDatabase instance = LocalDatabase._internal();
@@ -16,13 +16,15 @@ class LocalDatabase {
   LocalDatabase._internal();
 
   Database? _database;
+  Future<Database>? _initFuture;
 
   /// Retorna la instancia activa de la base de datos o la inicializa.
   Future<Database> get database async {
     if (_database != null && _database!.isOpen) {
       return _database!;
     }
-    _database = await _initDatabase();
+    _initFuture ??= _initDatabase();
+    _database = await _initFuture;
     return _database!;
   }
 
@@ -134,6 +136,24 @@ class LocalDatabase {
       );
     ''');
 
+    // 6. Tabla de caché offline para Estaciones de Trabajo (Mesas)
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS cache_estaciones (
+        id TEXT PRIMARY KEY,
+        codigo_estacion TEXT NOT NULL UNIQUE,
+        ambiente_id TEXT NOT NULL,
+        ambiente_nombre TEXT,
+        ambiente_ubicacion TEXT,
+        descripcion TEXT,
+        activos_json TEXT
+      );
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_cache_estaciones_codigo
+      ON cache_estaciones (codigo_estacion);
+    ''');
+
     debugPrint('✅ [LocalDatabase] Esquema SQLite inicializado con éxito.');
   }
 
@@ -175,6 +195,60 @@ class LocalDatabase {
       await db.execute("UPDATE cache_ambientes SET radio_geofence = 18.0, latitude = -16.577850, longitude = -68.196580 WHERE nombre LIKE '%Taller%2%';");
       await db.execute("UPDATE cache_ambientes SET radio_geofence = 15.0, latitude = -16.577785, longitude = -68.196520 WHERE nombre LIKE '%Oficina%';");
     }
+    if (oldVersion < 5) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS cache_estaciones (
+          id TEXT PRIMARY KEY,
+          codigo_estacion TEXT NOT NULL UNIQUE,
+          ambiente_id TEXT NOT NULL,
+          ambiente_nombre TEXT,
+          ambiente_ubicacion TEXT,
+          descripcion TEXT,
+          activos_json TEXT
+        );
+      ''');
+      await db.execute('''
+        CREATE INDEX IF NOT EXISTS idx_cache_estaciones_codigo
+        ON cache_estaciones (codigo_estacion);
+      ''');
+    }
+  }
+
+  /// Guarda estaciones de trabajo en caché local SQLite
+  Future<void> guardarEstaciones(List<Map<String, dynamic>> estaciones) async {
+    try {
+      final db = await database;
+      final batch = db.batch();
+      for (final est in estaciones) {
+        batch.insert(
+          'cache_estaciones',
+          est,
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
+    } catch (e) {
+      debugPrint('Error guardando estaciones en SQLite: $e');
+    }
+  }
+
+  /// Obtiene una estación por su código (ej. EST-LAB1-05) desde SQLite
+  Future<Map<String, dynamic>?> getEstacionPorCodigo(String codigo) async {
+    try {
+      final db = await database;
+      final results = await db.query(
+        'cache_estaciones',
+        where: 'LOWER(codigo_estacion) = LOWER(?)',
+        whereArgs: [codigo.trim()],
+        limit: 1,
+      );
+      if (results.isNotEmpty) {
+        return results.first;
+      }
+    } catch (e) {
+      debugPrint('Error buscando estación en SQLite: $e');
+    }
+    return null;
   }
 
   /// Guarda tipos de activos en caché local SQLite
