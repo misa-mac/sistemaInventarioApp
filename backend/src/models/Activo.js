@@ -11,7 +11,7 @@ const Activo = sequelize.define('Activo', {
     primaryKey: true,
   },
   codigo_activo: {
-    type: DataTypes.STRING(20),
+    type: DataTypes.STRING(25),
     unique: true,
     allowNull: true, // Asignado por el trigger de base de datos fn_activos_asignar_codigo
   },

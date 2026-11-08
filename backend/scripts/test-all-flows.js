@@ -40,25 +40,12 @@ async function testAllDatabaseFlows() {
     const amb2 = ambientes[1];
     console.log(`   ✅ Ambientes seleccionados: "${amb1.nombre}" (Cod: ${amb1.codigo}) y "${amb2.nombre}" (Cod: ${amb2.codigo})`);
 
-    // 4. TEST ACTIVOS (CREACIÓN CON CÓDIGO XYZAACC-GG)
-    console.log('\n4️⃣ [ACTIVOS]: Creando activo de prueba y verificando código QR...');
-    const maxCorr = await Activo.max('numero_correlativo', {
-      where: { tipo_activo_id: tipoCpu.id, ambiente_registro_id: amb1.id }
-    }) || 0;
-    const nextCorr = maxCorr + 1;
-    const YY = new Date().getFullYear().toString().slice(-2);
-    const AA = tipoCpu.codigo.toString().padStart(2, '0');
-    const CC = amb1.codigo.toString().padStart(2, '0');
-    const GG = nextCorr.toString().padStart(2, '0');
-    const expectedCodigo = `1${YY}${AA}${CC}-${GG}`;
-
+    // 4. TEST ACTIVOS (CREACIÓN CON CÓDIGO X·CC·TT·AA·NNNN-YY)
+    console.log('\n4️⃣ [ACTIVOS]: Creando activo de prueba y verificando código QR institucional...');
     const activoTest = await Activo.create({
       tipo_activo_id: tipoCpu.id,
       ambiente_id: amb1.id,
-      ambiente_registro_id: amb1.id,
-      numero_correlativo: nextCorr,
-      codigo_activo: expectedCodigo,
-      nombre: `Computadora de Prueba ${expectedCodigo}`,
+      nombre: `Computadora de Prueba Oficial`,
       marca: 'Dell',
       modelo: 'OptiPlex 7090',
       numero_serie: `TEST-SN-${Date.now()}`,
@@ -66,7 +53,11 @@ async function testAllDatabaseFlows() {
       valor: 850.50,
       observaciones: 'Activo para pruebas de integración'
     });
-    console.log(`   ✅ Activo creado con éxito: ${activoTest.codigo_activo} (ID: ${activoTest.id})`);
+    await activoTest.reload();
+    console.log(`   ✅ Activo creado con éxito por trigger: ${activoTest.codigo_activo} (Correlativo: ${activoTest.numero_correlativo}, ID: ${activoTest.id})`);
+    if (!/^1[0-9]{2}[0-9]{2}[0-9]{2}[0-9]{1,4}-[0-9]{2}$/.test(activoTest.codigo_activo)) {
+      throw new Error(`Código ${activoTest.codigo_activo} no cumple el formato institucional X·CC·TT·AA·NNNN-YY`);
+    }
 
     // 5. TEST ACTIVOS (BÚSQUEDA Y LECTURA)
     console.log('\n5️⃣ [ACTIVOS - BÚSQUEDA]: Probando consulta por código y por serie...');

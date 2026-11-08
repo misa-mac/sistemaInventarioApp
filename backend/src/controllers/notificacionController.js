@@ -54,10 +54,25 @@ exports.getMisNotificaciones = async (req, res) => {
 exports.marcarLeidas = async (req, res) => {
   try {
     const usuarioId = req.user.id;
+    const esAdmin = req.user.rol === 'admin';
     
+    // Si es administrador, también marca como leídas las notificaciones globales (usuario_id = null)
+    const whereCondition = esAdmin
+      ? {
+          [Op.or]: [
+            { usuario_id: usuarioId },
+            { usuario_id: null }
+          ],
+          leida: false
+        }
+      : {
+          usuario_id: usuarioId,
+          leida: false
+        };
+
     await Notificacion.update(
       { leida: true },
-      { where: { usuario_id: usuarioId, leida: false } }
+      { where: whereCondition }
     );
     
     res.json({ message: 'Notificaciones marcadas como leídas' });

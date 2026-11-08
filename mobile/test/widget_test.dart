@@ -18,7 +18,7 @@ void main() {
     final json = {
       'id': '550e8400-e29b-41d4-a716-446655440000',
       'uuid': '550e8400-e29b-41d4-a716-446655440000',
-      'codigo_activo': '1261020-04',
+      'codigo_activo': '15010204-24',
       'numero_correlativo': 4,
       'nombre': 'Computadora de Escritorio Core i7',
       'tipo': {'id': 't-1', 'nombre': 'CPU / Computadora', 'codigo': 10},
@@ -50,7 +50,7 @@ void main() {
     final activo = ActivoModel.fromJson(json);
 
     expect(activo.id, '550e8400-e29b-41d4-a716-446655440000');
-    expect(activo.qrCodigo, '1261020-04');
+    expect(activo.qrCodigo, '15010204-24');
     expect(activo.numeroCorrelativo, 4);
     expect(activo.nombre, 'Computadora de Escritorio Core i7');
     expect(activo.tipo, 'CPU / Computadora');

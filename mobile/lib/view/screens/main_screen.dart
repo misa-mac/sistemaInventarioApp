@@ -228,15 +228,6 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
           ),
-          const Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              bottom: false,
-              child: ConnectivityBanner(),
-            ),
-          ),
           if (!isKeyboardOpen)
             Positioned(
               left: 0,

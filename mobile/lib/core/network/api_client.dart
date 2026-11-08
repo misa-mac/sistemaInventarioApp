@@ -1,11 +1,24 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:inventario_qr_app/core/constants/api_constants.dart';
 import 'package:inventario_qr_app/core/storage/session_manager.dart';
+import 'package:inventario_qr_app/core/services/network_connectivity_service.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 class ApiClient {
   static const Duration defaultTimeout = Duration(seconds: 4);
+
+  void _reportSuccess() {
+    NetworkConnectivityService().applyConnectionStatus(true);
+  }
+
+  void _reportError(dynamic e) {
+    if (e is SocketException || e is http.ClientException || e is TimeoutException) {
+      NetworkConnectivityService().applyConnectionStatus(false);
+    }
+  }
 
   String get _baseUrl => ApiConstants.baseUrl;
 
@@ -40,17 +53,23 @@ class ApiClient {
   Future<dynamic> get(String endpoint) async {
     final url = _buildUri(endpoint);
     debugPrint('🌐 GET: $url');
-    final response = await http.get(url, headers: _getHeaders()).timeout(
-      defaultTimeout,
-      onTimeout: () => throw Exception('Tiempo de espera agotado al conectar con el servidor ($url).'),
-    );
-    
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      if (response.body.isEmpty) return [];
-      return jsonDecode(response.body);
-    } else {
-      debugPrint('❌ Error HTTP ${response.statusCode}: ${response.body}');
-      throw Exception('Error: ${response.statusCode} - ${response.body}');
+    try {
+      final response = await http.get(url, headers: _getHeaders()).timeout(
+        defaultTimeout,
+        onTimeout: () => throw Exception('Tiempo de espera agotado al conectar con el servidor ($url).'),
+      );
+      
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        _reportSuccess();
+        if (response.body.isEmpty) return [];
+        return jsonDecode(response.body);
+      } else {
+        debugPrint('❌ Error HTTP ${response.statusCode}: ${response.body}');
+        throw Exception('Error: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      _reportError(e);
+      rethrow;
     }
   }
 
@@ -60,25 +79,31 @@ class ApiClient {
     debugPrint('📤 POST a: $url');
     debugPrint('📦 Body: $body');
     
-    final response = await http.post(
-      url,
-      headers: _getHeaders(),
-      body: jsonEncode(body),
-    ).timeout(
-      defaultTimeout,
-      onTimeout: () => throw Exception('Tiempo de espera agotado al conectar con el servidor ($url).'),
-    );
+    try {
+      final response = await http.post(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(
+        defaultTimeout,
+        onTimeout: () => throw Exception('Tiempo de espera agotado al conectar con el servidor ($url).'),
+      );
 
-    debugPrint('📥 Status: ${response.statusCode}');
-    
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      if (response.body.isEmpty) {
-        return {};
+      debugPrint('📥 Status: ${response.statusCode}');
+      
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        _reportSuccess();
+        if (response.body.isEmpty) {
+          return {};
+        }
+        return jsonDecode(response.body);
+      } else {
+        debugPrint('❌ Error HTTP ${response.statusCode}: ${response.body}');
+        throw Exception('Error: ${response.statusCode} - ${response.body}');
       }
-      return jsonDecode(response.body);
-    } else {
-      debugPrint('❌ Error HTTP ${response.statusCode}: ${response.body}');
-      throw Exception('Error: ${response.statusCode} - ${response.body}');
+    } catch (e) {
+      _reportError(e);
+      rethrow;
     }
   }
 
@@ -88,25 +113,31 @@ class ApiClient {
     debugPrint('🔄 PUT a: $url');
     debugPrint('📦 Body: $body');
     
-    final response = await http.put(
-      url,
-      headers: _getHeaders(),
-      body: jsonEncode(body),
-    ).timeout(
-      defaultTimeout,
-      onTimeout: () => throw Exception('Tiempo de espera agotado al conectar con el servidor ($url).'),
-    );
+    try {
+      final response = await http.put(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(
+        defaultTimeout,
+        onTimeout: () => throw Exception('Tiempo de espera agotado al conectar con el servidor ($url).'),
+      );
 
-    debugPrint('📥 Status: ${response.statusCode}');
-    
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      if (response.body.isEmpty) {
-        return {};
+      debugPrint('📥 Status: ${response.statusCode}');
+      
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        _reportSuccess();
+        if (response.body.isEmpty) {
+          return {};
+        }
+        return jsonDecode(response.body);
+      } else {
+        debugPrint('❌ Error HTTP ${response.statusCode}: ${response.body}');
+        throw Exception('Error: ${response.statusCode} - ${response.body}');
       }
-      return jsonDecode(response.body);
-    } else {
-      debugPrint('❌ Error HTTP ${response.statusCode}: ${response.body}');
-      throw Exception('Error: ${response.statusCode} - ${response.body}');
+    } catch (e) {
+      _reportError(e);
+      rethrow;
     }
   }
 
@@ -116,25 +147,31 @@ class ApiClient {
     debugPrint('🔧 PATCH a: $url');
     debugPrint('📦 Body: $body');
     
-    final response = await http.patch(
-      url,
-      headers: _getHeaders(),
-      body: jsonEncode(body),
-    ).timeout(
-      defaultTimeout,
-      onTimeout: () => throw Exception('Tiempo de espera agotado al conectar con el servidor ($url).'),
-    );
+    try {
+      final response = await http.patch(
+        url,
+        headers: _getHeaders(),
+        body: jsonEncode(body),
+      ).timeout(
+        defaultTimeout,
+        onTimeout: () => throw Exception('Tiempo de espera agotado al conectar con el servidor ($url).'),
+      );
 
-    debugPrint('📥 Status: ${response.statusCode}');
-    
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      if (response.body.isEmpty) {
-        return {};
+      debugPrint('📥 Status: ${response.statusCode}');
+      
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        _reportSuccess();
+        if (response.body.isEmpty) {
+          return {};
+        }
+        return jsonDecode(response.body);
+      } else {
+        debugPrint('❌ Error HTTP ${response.statusCode}: ${response.body}');
+        throw Exception('Error: ${response.statusCode} - ${response.body}');
       }
-      return jsonDecode(response.body);
-    } else {
-      debugPrint('❌ Error HTTP ${response.statusCode}: ${response.body}');
-      throw Exception('Error: ${response.statusCode} - ${response.body}');
+    } catch (e) {
+      _reportError(e);
+      rethrow;
     }
   }
 
@@ -143,21 +180,27 @@ class ApiClient {
     
     debugPrint('🗑️ DELETE a: $url');
     
-    final response = await http.delete(url, headers: _getHeaders()).timeout(
-      const Duration(seconds: 10),
-      onTimeout: () => throw Exception('Tiempo de espera agotado al conectar con el servidor ($url).'),
-    );
+    try {
+      final response = await http.delete(url, headers: _getHeaders()).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => throw Exception('Tiempo de espera agotado al conectar con el servidor ($url).'),
+      );
 
-    debugPrint('📥 Status: ${response.statusCode}');
-    
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      if (response.body.isEmpty) {
-        return {};
+      debugPrint('📥 Status: ${response.statusCode}');
+      
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        _reportSuccess();
+        if (response.body.isEmpty) {
+          return {};
+        }
+        return jsonDecode(response.body);
+      } else {
+        debugPrint('❌ Error HTTP ${response.statusCode}: ${response.body}');
+        throw Exception('Error: ${response.statusCode} - ${response.body}');
       }
-      return jsonDecode(response.body);
-    } else {
-      debugPrint('❌ Error HTTP ${response.statusCode}: ${response.body}');
-      throw Exception('Error: ${response.statusCode} - ${response.body}');
+    } catch (e) {
+      _reportError(e);
+      rethrow;
     }
   }
 }

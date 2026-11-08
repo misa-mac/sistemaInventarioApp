@@ -296,6 +296,27 @@ class LocalDatabase {
     debugPrint('🧹 [LocalDatabase] Tablas de caché limpiadas.');
   }
 
+  /// Retorna la cantidad total de registros pendientes en la cola offline (escaneos + solicitudes).
+  Future<int> getTotalPendientesCount() async {
+    try {
+      final db = await database;
+      int count = 0;
+      final escaneos = Sqflite.firstIntValue(await db.rawQuery(
+        'SELECT COUNT(*) FROM escaneos_pendientes WHERE sincronizado = 0',
+      ));
+      count += (escaneos ?? 0);
+
+      final solicitudes = Sqflite.firstIntValue(await db.rawQuery(
+        'SELECT COUNT(*) FROM solicitudes_pendientes WHERE sincronizado = 0',
+      ));
+      count += (solicitudes ?? 0);
+
+      return count;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   /// Cierra la base de datos (útil en teardown de pruebas o reset completo).
   Future<void> close() async {
     if (_database != null && _database!.isOpen) {

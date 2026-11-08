@@ -53,51 +53,52 @@ CREATE INDEX IF NOT EXISTS idx_solicitudes_solicitante ON solicitudes_cambio(sol
 CREATE INDEX IF NOT EXISTS idx_solicitudes_activo      ON solicitudes_cambio(activo_id);
 CREATE INDEX IF NOT EXISTS idx_solicitudes_tipo        ON solicitudes_cambio(tipo);
 
--- 5. Ajuste del trigger de asignación de código para asegurar que la base sea la única fuente de verdad
+-- 5. Generador automático del código institucional real X·CC·TT·AA·NNNN-YY
 CREATE OR REPLACE FUNCTION fn_activos_asignar_codigo() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
+  v_tt INTEGER;
   v_aa INTEGER;
-  v_cc INTEGER;
+  v_yy TEXT;
 BEGIN
-  IF NEW.ambiente_registro_id IS NULL THEN
-    NEW.ambiente_registro_id := NEW.ambiente_id;
+  SELECT codigo INTO v_tt FROM tipo_activos WHERE id = NEW.tipo_activo_id;
+  SELECT codigo INTO v_aa FROM ambientes    WHERE id = NEW.ambiente_id;
+
+  IF v_tt IS NULL OR v_aa IS NULL THEN
+    RAISE EXCEPTION 'Tipo de activo o ambiente inexistente al asignar código';
   END IF;
 
-  -- Si codigo_activo es nulo o vacío, la base de datos lo genera obligatoriamente
-  IF NEW.codigo_activo IS NULL OR btrim(NEW.codigo_activo) = '' THEN
-    SELECT codigo INTO v_aa FROM tipo_activos WHERE id = NEW.tipo_activo_id;
-    SELECT codigo INTO v_cc FROM ambientes    WHERE id = NEW.ambiente_registro_id;
-    IF v_aa IS NULL OR v_cc IS NULL THEN
-      RAISE EXCEPTION 'Tipo de activo o ambiente de registro inexistente';
-    END IF;
+  -- Bloqueo transaccional consultivo para evitar colisiones en altas concurrentes
+  PERFORM pg_advisory_xact_lock(
+    hashtextextended('50' || NEW.tipo_activo_id::text || NEW.ambiente_id::text, 0)
+  );
 
-    -- Evita correlativos duplicados con altas simultáneas
-    PERFORM pg_advisory_xact_lock(
-      hashtextextended(NEW.tipo_activo_id::text || NEW.ambiente_registro_id::text, 0));
-
-    IF NEW.numero_correlativo IS NULL THEN
-      SELECT COALESCE(MAX(numero_correlativo), 0) + 1
-        INTO NEW.numero_correlativo
-        FROM activos
-       WHERE tipo_activo_id = NEW.tipo_activo_id
-         AND ambiente_registro_id = NEW.ambiente_registro_id;
-    END IF;
-
-    IF NEW.numero_correlativo > 99 THEN
-      RAISE EXCEPTION 'Se agotó el correlativo (máx. 99) para este tipo en este ambiente';
-    END IF;
-
-    NEW.codigo_activo := '1'
-      || to_char(COALESCE(NEW.fecha_ingreso, CURRENT_DATE), 'YY')
-      || lpad(v_aa::text, 2, '0')
-      || lpad(v_cc::text, 2, '0')
-      || '-' || lpad(NEW.numero_correlativo::text, 2, '0');
+  -- Asigna el siguiente al máximo existente en esa carrera+tipo+ambiente (solo activos no dados de baja)
+  IF NEW.numero_correlativo IS NULL THEN
+    SELECT COALESCE(MAX(numero_correlativo), 0) + 1
+      INTO NEW.numero_correlativo
+      FROM activos
+     WHERE tipo_activo_id = NEW.tipo_activo_id
+       AND ambiente_id = NEW.ambiente_id
+       AND estado <> 'Inactivo';
   END IF;
 
+  IF NEW.numero_correlativo > 9999 OR NEW.numero_correlativo < 1 THEN
+    RAISE EXCEPTION 'El correlativo debe estar entre 1 y 9999 (máx. 9999 agotado para este tipo en este ambiente)';
+  END IF;
+
+  v_yy := to_char(COALESCE(NEW.fecha_ingreso, CURRENT_DATE), 'YY');
+  NEW.codigo_activo := '150'
+    || lpad(v_tt::text, 2, '0')
+    || lpad(v_aa::text, 2, '0')
+    || NEW.numero_correlativo::text
+    || '-' || v_yy;
+
+  -- Nombre descriptivo por defecto si viene vacío
   IF NEW.nombre IS NULL OR btrim(NEW.nombre) = '' THEN
     NEW.nombre := COALESCE((SELECT nombre FROM tipo_activos WHERE id = NEW.tipo_activo_id), 'Activo')
                   || ' ' || NEW.codigo_activo;
   END IF;
+
   RETURN NEW;
 END $$;
 

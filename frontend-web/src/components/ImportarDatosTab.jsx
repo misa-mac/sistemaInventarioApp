@@ -140,22 +140,22 @@ const ImportarDatosTab = () => {
 
     XLSX.utils.book_append_sheet(wb, wsPlantilla, 'Plantilla Activos');
 
-    // Hoja 2: Catálogo de Ambientes (Referencia)
+    // Hoja 2: Catálogo de Ambientes (Referencia - Código AA)
     const ambientesData = [
-      ['Código (CC)', 'Nombre del Ambiente', 'Área / Bloque Físico'],
+      ['Código Ambiente (AA)', 'Nombre del Ambiente', 'Área / Bloque Físico'],
       ...ambientes.map(a => [a.codigo, a.nombre, a.ubicacion || '-'])
     ];
     const wsAmbientes = XLSX.utils.aoa_to_sheet(ambientesData);
-    wsAmbientes['!cols'] = [{ wch: 14 }, { wch: 28 }, { wch: 30 }];
+    wsAmbientes['!cols'] = [{ wch: 22 }, { wch: 28 }, { wch: 30 }];
     XLSX.utils.book_append_sheet(wb, wsAmbientes, 'Ambientes Disponibles');
 
-    // Hoja 3: Catálogo de Categorías (Referencia)
+    // Hoja 3: Catálogo de Tipos/Categorías (Referencia - Código TT)
     const tiposData = [
-      ['Código (AA)', 'Nombre de Categoría', 'Descripción'],
+      ['Código Tipo (TT)', 'Nombre de Categoría', 'Descripción'],
       ...tipos.map(t => [t.codigo, t.nombre, t.descripcion || '-'])
     ];
     const wsTipos = XLSX.utils.aoa_to_sheet(tiposData);
-    wsTipos['!cols'] = [{ wch: 14 }, { wch: 28 }, { wch: 35 }];
+    wsTipos['!cols'] = [{ wch: 20 }, { wch: 28 }, { wch: 35 }];
     XLSX.utils.book_append_sheet(wb, wsTipos, 'Categorias Disponibles');
 
     // Descargar archivo
@@ -204,8 +204,8 @@ const ImportarDatosTab = () => {
       // Extracción inteligente de campos según posibles encabezados
       const nombre = normalizedRow['nombre del activo'] || normalizedRow['nombre'] || normalizedRow['activo'] || '';
       
-      const tipoRaw = normalizedRow['categoria o codigo aa'] || normalizedRow['categoria'] || normalizedRow['tipo'] || normalizedRow['codigo aa'] || '';
-      const ambienteRaw = normalizedRow['ambiente o codigo cc'] || normalizedRow['ambiente'] || normalizedRow['laboratorio'] || normalizedRow['codigo cc'] || '';
+      const tipoRaw = normalizedRow['categoria o codigo tt'] || normalizedRow['categoria o codigo aa'] || normalizedRow['categoria'] || normalizedRow['tipo'] || normalizedRow['codigo tt'] || normalizedRow['codigo aa'] || '';
+      const ambienteRaw = normalizedRow['ambiente o codigo aa'] || normalizedRow['ambiente o codigo cc'] || normalizedRow['ambiente'] || normalizedRow['laboratorio'] || normalizedRow['codigo aa'] || normalizedRow['codigo cc'] || '';
       
       const marca = normalizedRow['marca'] || '';
       const modelo = normalizedRow['modelo'] || '';
@@ -717,7 +717,7 @@ const ImportarDatosTab = () => {
                       <td className="p-3.5">
                         {row.matchedTipo ? (
                           <span className="font-medium text-on-surface bg-surface-container px-2 py-0.5 rounded">
-                            {row.matchedTipo.nombre} (AA: {row.matchedTipo.codigo})
+                            {row.matchedTipo.nombre} (TT: {row.matchedTipo.codigo.toString().padStart(2, '0')})
                           </span>
                         ) : (
                           <span className="text-error font-medium">{row.tipoRaw || 'No indicado'}</span>
@@ -726,7 +726,7 @@ const ImportarDatosTab = () => {
                       <td className="p-3.5">
                         {row.matchedAmbiente ? (
                           <span className="font-medium text-on-surface bg-surface-container px-2 py-0.5 rounded">
-                            {row.matchedAmbiente.nombre} (CC: {row.matchedAmbiente.codigo})
+                            {row.matchedAmbiente.nombre} (AA: {row.matchedAmbiente.codigo.toString().padStart(2, '0')})
                           </span>
                         ) : (
                           <span className="text-error font-medium">{row.ambienteRaw || 'No indicado'}</span>

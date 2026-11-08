@@ -92,7 +92,7 @@ void main() {
         'id': id,
         'auditoria_id': 'aud-001',
         'activo_id': 'act-101',
-        'codigo_qr_escaneado': '1500101-01',
+        'codigo_qr_escaneado': '15010201-26',
         'estado': 'presente',
         'observacion': 'En buen estado',
         'fecha_escaneo': fechaUtc,
@@ -203,7 +203,7 @@ void main() {
     });
 
     test('4. Comportamiento de duplicados: se permiten múltiples escaneos del mismo activo sin violación de restricciones', () async {
-      const qrMismo = '1500101-99';
+      const qrMismo = '150102099-26';
       const activoMismo = 'act-99';
 
       // Primer escaneo
@@ -390,7 +390,7 @@ void main() {
           'numero_serie': 'SN12345',
           'estado': 'Activo',
           'ambiente_id': ambId,
-          'codigo_activo': '1500101-01',
+          'codigo_activo': '15010201-26',
           'imagen_url': 'http://img.jpg',
           'observaciones': 'Buen estado',
           'numero_correlativo': 1,
@@ -405,7 +405,7 @@ void main() {
           'numero_serie': 'HP67890',
           'estado': 'Activo',
           'ambiente_id': ambId,
-          'codigo_activo': '1500101-02',
+          'codigo_activo': '15010202-26',
           'numero_correlativo': 2,
         });
         await batch.commit(noResult: true);
@@ -418,8 +418,8 @@ void main() {
       );
 
       expect(activos.length, equals(2));
-      expect(activos.any((a) => a['codigo_activo'] == '1500101-01'), isTrue);
-      expect(activos.any((a) => a['codigo_activo'] == '1500101-02'), isTrue);
+      expect(activos.any((a) => a['codigo_activo'] == '15010201-26'), isTrue);
+      expect(activos.any((a) => a['codigo_activo'] == '15010202-26'), isTrue);
     });
   });
 }

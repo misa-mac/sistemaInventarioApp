@@ -13,7 +13,7 @@
 Las siguientes evidencias documentan la ejecución operativa, pruebas de integración, cobertura de código y validación de geocercas del sistema de inventario.
 
 ### Evidencia 1: Prueba de Escaneo en Tiempo Real (App Móvil)
-* **Descripción:** Ejecución del módulo de escaneo óptico de la aplicación móvil (Flutter) capturando y decodificando un código QR oficial con formato `1262021-01` adherido a un equipo informático (CPU HP Pavilion 450 G8 en Laboratorio 1).
+* **Descripción:** Ejecución del módulo de escaneo óptico de la aplicación móvil (Flutter) capturando y decodificando un código QR oficial con formato institucional `15010201-26` (`X·CC·TT·AA·NNNN-YY`) adherido a un equipo informático (CPU HP Pavilion 450 G8 en Laboratorio 1).
 * **Validación:** Se observa la retícula de enfoque con brackets luminosos verdes, la lectura instantánea sin desfase de cuadros y el despliegue del modal inferior de previsualización con estado "ACTIVO", permitiendo al operador confirmar o continuar el barrido físico.
 
 ![Evidencia 1: Prueba de Escaneo Óptico QR con App Móvil](evidencias/evidencia_1_escaneo_qr.jpg)
@@ -49,7 +49,7 @@ Las siguientes evidencias documentan la ejecución operativa, pruebas de integra
 ### 3.1 Pruebas de la App Móvil (Fase sin Etiquetado Físico Definitivo)
 Las pruebas del módulo de escaneo se realizaron de manera exitosa utilizando códigos QR generados dinámicamente en pantalla y muestras impresas en papel bond. Esto permitió validar completamente el flujo lógico de lectura, decodificación y comunicación con la API sin necesidad de adherir etiquetas físicas definitivas en esta fase.
 
-* **Flujo validado:** Generación del código oficial `1YYAACC-GG` en la base de datos PostgreSQL -> Renderizado e impresión de matriz QR -> Lectura mediante sensor de cámara en Flutter -> Deserialización JSON -> Cotejo de estado de inventario -> Registro de movimiento o auditoría.
+* **Flujo validado:** Generación del código institucional oficial `X·CC·TT·AA·NNNN-YY` (ej. `15010201-26`) en la base de datos PostgreSQL -> Renderizado e impresión de matriz QR -> Lectura mediante sensor de cámara en Flutter -> Deserialización JSON -> Cotejo de estado de inventario -> Registro de movimiento o auditoría.
 
 ### 3.2 Resultados de las Pruebas de Integración
 Las pruebas de integración (API REST, Aplicación Web, Aplicación Móvil, Base de Datos Local SQLite y Audit Logger OWASP) resultaron exitosas en su totalidad. Durante el proceso se identificó un error menor de latencia en la sincronización offline con SQLite, el cual fue corregido optimizando las consultas asíncronas y transacciones batch en el repositorio local.
@@ -57,9 +57,9 @@ Las pruebas de integración (API REST, Aplicación Web, Aplicación Móvil, Base
 #### Tabla 23: Matriz Resumen de Pruebas de Integración
 
 | Módulo Evaluado | Protocolo / Componente | Escenario de Prueba | Resultado | Observaciones |
-| :--- | :--- | :--- | :---: | :--- |
+| :--- | :--- | :--- | :--- | :--- |
 | **API RESTful** | Express / Sequelize | Inyección de cabecera `X-Client: mobile` en rutas protegidas de escritura directa. | **200 OK / 403 Forbidden** | Rechaza mutación directa desde móvil; delega confirmación a Web. |
-| **Gobernanza Web** | React 18 / Vite | Aprobación atómica de alta con trigger `fn_activos_asignar_codigo()`. | **200 OK** | El activo nace con código `1YYAACC-GG` asignado por DB; habilita impresión QR. |
+| **Gobernanza Web** | React 18 / Vite | Aprobación atómica de alta con trigger `fn_activos_asignar_codigo()`. | **200 OK** | El activo nace con código institucional `X·CC·TT·AA·NNNN-YY` asignado por DB; habilita impresión QR. |
 | **Gobernanza Web** | React 18 / Vite | Rechazo de solicitud de cambio sin comentario explicativo obligatorio. | **400 Bad Request** | Validación estricta en servidor; rechazo requiere justificación. |
 | **Móvil Offline** | SQLite (sqflite) | Almacenamiento local en tabla `solicitudes_pendientes` durante corte de red. | **Exitoso** | Registro con UUID v4 e idempotencia garantizada al reconectar. |
 | **Geofencing GPS** | Geolocator / Android | Precisión degradada (> 30 metros) por interferencia estructural. | **Exitoso** | Regla aplicada: la lectura es ignorada y reintentada hasta estabilizar. |

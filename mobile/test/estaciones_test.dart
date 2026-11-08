@@ -26,7 +26,7 @@ void main() {
         'activos': [
           {
             'id': 'cpu-1',
-            'codigo_activo': '1261020-01',
+            'codigo_activo': '15010201-26',
             'nombre': 'CPU HP ProDesk',
             'tipo': 'CPU',
             'marca': 'HP',
@@ -37,7 +37,7 @@ void main() {
           },
           {
             'id': 'mon-1',
-            'codigo_activo': '1262020-01',
+            'codigo_activo': '15080201-26',
             'nombre': 'Monitor Samsung 24',
             'tipo': 'Monitor',
             'marca': 'Samsung',
@@ -48,7 +48,7 @@ void main() {
           },
           {
             'id': 'tec-1',
-            'codigo_activo': '1263020-01',
+            'codigo_activo': '15050201-26',
             'nombre': 'Teclado Genius USB',
             'tipo': 'Teclado',
             'marca': 'Genius',
@@ -59,7 +59,7 @@ void main() {
           },
           {
             'id': 'mou-1',
-            'codigo_activo': '1264020-01',
+            'codigo_activo': '15060201-26',
             'nombre': 'Mouse Óptico Logitech',
             'tipo': 'Mouse',
             'marca': 'Logitech',
@@ -80,7 +80,7 @@ void main() {
       expect(estacion.componentes[0].nombre, 'CPU HP ProDesk');
       expect(estacion.componentes[1].tipo, 'Monitor');
       expect(estacion.componentes[2].marca, 'Genius');
-      expect(estacion.componentes[3].qrCodigo, '1264020-01');
+      expect(estacion.componentes[3].qrCodigo, '15060201-26');
     });
 
     test('2. Guardar y recuperar estación en SQLite offline (cache_estaciones)', () async {

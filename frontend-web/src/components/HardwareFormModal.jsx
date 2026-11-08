@@ -323,7 +323,7 @@ const HardwareFormModal = ({ isOpen, onClose, onSuccess, editData }) => {
                   >
                     <option value="">Seleccione...</option>
                     {tiposActivos.map(t => (
-                      <option key={t.id} value={t.id}>{t.nombre} ({t.codigo})</option>
+                      <option key={t.id} value={t.id}>{t.nombre} (TT: {t.codigo.toString().padStart(2, '0')})</option>
                     ))}
                   </select>
                 </div>
@@ -341,7 +341,7 @@ const HardwareFormModal = ({ isOpen, onClose, onSuccess, editData }) => {
                     <option value="">Seleccione...</option>
                     {ambientes.map((amb) => (
                       <option key={amb.id} value={amb.id}>
-                        {amb.nombre} {amb.ubicacion ? `— ${amb.ubicacion}` : ''} (CC: {amb.codigo.toString().padStart(2, '0')})
+                        {amb.nombre} {amb.ubicacion ? `— ${amb.ubicacion}` : ''} (AA: {amb.codigo.toString().padStart(2, '0')})
                       </option>
                     ))}
                   </select>

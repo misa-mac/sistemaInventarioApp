@@ -101,8 +101,8 @@ describe('Gobernanza de Inventario - Suite de Pruebas de Solicitudes y Seguridad
     expect(resEscribirDirecto.status).toBe(403);
   });
 
-  // 2. Admin aprueba una alta (el activo nace con código XYZAACC-GG generado por el trigger)
-  test('2. El admin aprueba una alta: el activo nace con código que cumple el formato XYZAACC-GG', async () => {
+  // 2. Admin aprueba una alta (el activo nace con código institucional X·CC·TT·AA·NNNN-YY generado por el trigger)
+  test('2. El admin aprueba una alta: el activo nace con código que cumple el formato institucional X·CC·TT·AA·NNNN-YY', async () => {
     const resCrear = await request(app)
       .post('/api/solicitudes')
       .set('Authorization', `Bearer ${tecnicoToken}`)

@@ -4,6 +4,7 @@ const Ambiente = require('../models/Ambiente');
 const Usuario = require('../models/Usuario');
 const Activo = require('../models/Activo');
 const EstacionTrabajo = require('../models/EstacionTrabajo');
+const Notificacion = require('../models/Notificacion');
 const { Op } = require('sequelize');
 
 exports.create = async (req, res) => {
@@ -436,6 +437,29 @@ exports.sync = async (req, res) => {
       total_faltantes: faltantes,
       total_no_esperados: noEsperados
     });
+
+    // Notificación asíncrona para el panel web si se sincronizaron equipos
+    if (creados.length > 0) {
+      try {
+        let nombreAmbiente = 'ambiente';
+        if (auditoria.ambiente_id) {
+          const amb = await Ambiente.findByPk(auditoria.ambiente_id);
+          if (amb) {
+            nombreAmbiente = amb.nombre || `Ambiente ${amb.codigo}`;
+          }
+        }
+
+        await Notificacion.create({
+          usuario_id: null, // Notificación global para administración
+          titulo: 'Auditoría Sincronizada',
+          mensaje: `Se han sincronizado ${creados.length} equipos del ${nombreAmbiente}`,
+          tipo: 'success',
+          leida: false
+        });
+      } catch (notifErr) {
+        console.error('Error creando notificación de sincronización:', notifErr);
+      }
+    }
 
     res.json({
       message: 'Sincronización completada exitosamente',

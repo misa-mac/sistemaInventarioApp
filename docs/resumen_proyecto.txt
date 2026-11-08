@@ -36,10 +36,10 @@ Se construyó un frontend ultrarrápido y reactivo:
 5. MÓDULOS COMPLETADOS (Funcionalidades Clave)
 -----------------------------------------------------------
 - **Gestión de Activos y Archivos:** CRUD completo. Se implementó `multer` en el backend para gestionar subidas de fotos y `browser-image-compression` en el frontend para comprimir las imágenes en el navegador antes de enviarlas, optimizando el espacio del servidor.
-- **Generación e Impresión de QR:** Lógica estricta de codificación oficial `XYZAACC-GG`. Sistema de impresión nativo (volcado de DOM a ventana) que garantiza la impresión exacta de etiquetas de 3x3cm (ignorando fallos de librerías de terceros).
+- **Generación e Impresión de QR:** Lógica estricta de codificación oficial `X·CC·TT·AA·NNNN-YY` (ej. `15010201-26`). Sistema de impresión nativo (volcado de DOM a ventana) que garantiza la impresión exacta de etiquetas de 3x3cm (ignorando fallos de librerías de terceros).
 - **Reportes Estadísticos:** Gráficos visuales integrados con `recharts`. Motores de exportación directa a Excel (mediante `xlsx`) y a PDF corporativo (mediante `jspdf` y `jspdf-autotable`).
-- **Gestión de Infraestructura (Ambientes):** CRUD para crear y administrar laboratorios/talleres, dictando el código `CC` del inventario.
-- **Configuración (Catálogos):** CRUD para tipos de activos (categorías de hardware), definiendo dinámicamente los códigos `AA`. Pantalla de visualización de parámetros bloqueados (`X=1`, `YZ=50`).
+- **Gestión de Infraestructura (Ambientes):** CRUD para crear y administrar laboratorios/talleres con geocercas GPS y dictando el código `AA` del activo.
+- **Configuración (Catálogos):** CRUD para tipos de activos (categorías de hardware), definiendo dinámicamente los códigos `TT`. Parámetros fijados por normativa (`X=1`, `CC=50`).
 - **Roles y Permisos (RBAC):** CRUD de usuarios. Protección severa de rutas en el backend y frontend (solo el rol 'admin' puede crear/borrar usuarios o acceder al panel). Contraseñas encriptadas nativamente con `bcrypt`.
 
 - **Historial de Eventos (Movimientos, Traslados y Mantenimientos):** Interfaz unificada (`HistorialPage.jsx`) para registrar cualquier suceso en la vida de un activo. Soporta:
@@ -112,7 +112,7 @@ La base de datos PostgreSQL está normalizada y gestionada por Sequelize. Consta
 
 4. Activos (Equipos y Hardware)
    - id (UUID, PK)
-   - codigo_activo (String, Unique, Formato: XYZAACC-GG)
+   - codigo_activo (String, Unique, Formato: X·CC·TT·AA·NNNN-YY, ej. 15010201-26)
    - numero_correlativo (Integer)
    - tipo_activo_id (UUID, FK -> TipoActivos)
    - ambiente_id (UUID, FK -> Ambientes)

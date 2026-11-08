@@ -11,6 +11,7 @@ import 'package:inventario_qr_app/viewmodel/activo_viewmodel.dart';
 import 'package:inventario_qr_app/viewmodel/auditoria_viewmodel.dart';
 import 'package:inventario_qr_app/viewmodel/solicitud_viewmodel.dart';
 import 'package:inventario_qr_app/view/widgets/auth_wrapper.dart';
+import 'package:inventario_qr_app/view/widgets/connectivity_banner.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main() async {
@@ -50,6 +51,22 @@ class MyApp extends StatelessWidget {
         supportedLocales: const [
           Locale('es', 'ES'), // Español, España
         ],
+        builder: (context, child) {
+          return Stack(
+            children: [
+              if (child != null) child,
+              const Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: SafeArea(
+                  bottom: false,
+                  child: ConnectivityBanner(),
+                ),
+              ),
+            ],
+          );
+        },
         home: const AuthWrapper(),
         onGenerateRoute: AppRoutes.generateRoute,
       ),

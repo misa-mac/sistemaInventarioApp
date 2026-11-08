@@ -12,7 +12,7 @@ import HistorialPage from './pages/HistorialPage';
 import SolicitudesPage from './pages/SolicitudesPage';
 import EstacionesPage from './pages/EstacionesPage';
 import api from './services/api';
-import { LayoutDashboard, Monitor, LogOut, Settings, Bell, Search, Menu, FileText, Building, Shield, Users, AlertTriangle, Info, Clock, Layers, LayoutGrid } from 'lucide-react';
+import { LayoutDashboard, Monitor, LogOut, Settings, Bell, Search, Menu, FileText, Building, Shield, Users, AlertTriangle, Info, Clock, Layers, LayoutGrid, CheckCircle2 } from 'lucide-react';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useAuth();
@@ -149,8 +149,8 @@ const Header = () => {
 
   useEffect(() => {
     fetchNotifs();
-    // Poll notifications every minute
-    const interval = setInterval(fetchNotifs, 60000);
+    // Sondeo de notificaciones cada 30 segundos
+    const interval = setInterval(fetchNotifs, 30000);
     return () => clearInterval(interval);
   }, [user]);
 
@@ -214,8 +214,16 @@ const Header = () => {
                   notifs.map(n => (
                     <div key={n.id} className="p-4 border-b border-surface-container-highest last:border-0 hover:bg-surface-container/50 transition-colors cursor-default">
                       <div className="flex gap-3">
-                        <div className={`mt-0.5 w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${n.tipo === 'warning' ? 'bg-amber-100 text-amber-600' : n.tipo === 'error' ? 'bg-error-container text-on-error-container' : 'bg-primary-container text-primary'}`}>
-                          {n.tipo === 'warning' ? <AlertTriangle size={14} /> : n.tipo === 'error' ? <Shield size={14} /> : <Info size={14} />}
+                        <div className={`mt-0.5 w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                          n.tipo === 'success' ? 'bg-emerald-100 text-emerald-600' :
+                          n.tipo === 'warning' ? 'bg-amber-100 text-amber-600' :
+                          n.tipo === 'error' ? 'bg-error-container text-on-error-container' :
+                          'bg-primary-container text-primary'
+                        }`}>
+                          {n.tipo === 'success' ? <CheckCircle2 size={14} /> :
+                           n.tipo === 'warning' ? <AlertTriangle size={14} /> :
+                           n.tipo === 'error' ? <Shield size={14} /> :
+                           <Info size={14} />}
                         </div>
                         <div>
                           <p className="text-sm font-medium text-on-surface mb-0.5">{n.titulo}</p>
